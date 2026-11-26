@@ -45,7 +45,15 @@
           <label>발주일<input name="orderDate" type="date"></label>
           <label>납품일<input name="deliveryDate" type="date"></label>
           <label>담당 / 연락처<input name="contact" maxlength="80" placeholder="담당자 및 전화번호"></label>
-          <label>납품 장소<input name="address" maxlength="140" placeholder="주소 또는 인수 장소"></label>
+          <fieldset class="delivery-location">
+            <legend>납품 장소</legend>
+            <div class="choices">
+              <label><input id="deliver-office" type="radio" name="deliveryDestination" value="office"><span>한국닥트 사무실</span></label>
+              <label><input id="deliver-site" type="radio" name="deliveryDestination" value="site" checked><span>현장</span></label>
+            </div>
+            <input id="delivery-address" name="address" maxlength="140" aria-label="현장 주소 또는 인수 장소" placeholder="현장 주소 또는 인수 장소">
+            <output id="office-address" class="office-address" hidden></output>
+          </fieldset>
         </div>
       </section>
 
@@ -212,6 +220,22 @@
               <div id="damper-length" class="branch-fields" hidden>
                 <div><span>제작 길이 L (고정)</span><strong id="damper-length-value"></strong></div>
               </div>
+              <fieldset id="damper-power" class="conditional" aria-label="댐퍼 전원 사양" hidden disabled>
+                <label>전압
+                  <select name="voltage">
+                    <option value="">선택</option>
+                    <option value="220V">220V</option>
+                    <option value="380V">380V</option>
+                  </select>
+                </label>
+                <label>전원 방식
+                  <select name="phase">
+                    <option value="">선택</option>
+                    <option value="단상">단상</option>
+                    <option value="삼상">삼상</option>
+                  </select>
+                </label>
+              </fieldset>
               <fieldset id="offset-options" class="offset-options" hidden disabled>
                 <legend>양쪽 직선부 C를 넣을까요?</legend>
                 <div class="choices">
@@ -258,11 +282,6 @@
                   <label><input type="radio" name="insulation" value="artilon"><span>아티론</span></label>
                 </div>
               </fieldset>
-              <div id="insulation-fields" class="conditional" hidden>
-                <label id="artilon-field" hidden>아티론 두께 (T)<input name="artilon" type="number" min="0" step="any" inputmode="decimal" placeholder="두께 직접 입력"></label>
-                <label>HB값<input name="hb" maxlength="48" placeholder="현장 HB값 입력" aria-describedby="hb-hint"></label>
-                <p class="field-hint" id="hb-hint" aria-live="polite"></p>
-              </div>
             </div>
 
             <div class="form-section">

@@ -96,20 +96,9 @@ const orderCalculations = (() => {
     return pieces;
   }
 
-  function hbKey({ type, width, height, outletWidth, outletHeight, insulation, artilon, model, params }) {
-    let ends = hasTwoEnds(type) ? `${type}|${width}x${height}>${outletWidth}x${outletHeight}` : `${width}x${height}`;
-    if (isCatalogItem(type)) {
-      const profile = spiralCatalog.get(model).fields.filter(field => field.diameter || field.ovalDepth || ['width', 'height', 'l1', 'l2'].includes(field.key));
-      ends = `${type}|${model}|${profile.map(field => params[field.key]).join('x')}`;
-    }
-    if (insulation === 'rubber') return `${ends}|rubber|13`;
-    if (insulation === 'artilon' && artilon) return `${ends}|artilon|${artilon}`;
-    return '';
-  }
-
   function insulationText({ insulation, artilon }) {
     if (insulation === 'rubber') return '고무발포 13T';
-    if (insulation === 'artilon') return `아티론 ${artilon ? `${artilon}T` : '(두께 확인 필요)'}`;
+    if (insulation === 'artilon') return artilon ? `아티론 ${artilon}T` : '아티론';
     return '미사용';
   }
 
@@ -189,14 +178,14 @@ const orderCalculations = (() => {
   function orderItems(runs) {
     const items = new Map();
     for (const run of runs) {
-      const { width, height, material, insulation, artilon, hb, reinforcementWidth, memo } = run;
+      const { width, height, material, insulation, artilon, voltage, phase, reinforcementWidth, memo } = run;
       const type = ductType(run);
       for (const piece of orderPieces(run)) {
         const productionLength = piece.length ?? run.length;
         const shape = isCatalogItem(type) ? [run.model, piece.params ?? run.params, run.spiralThickness]
           : [width, height, productionLength, run.radius, run.rise, run.inlet, run.equalEndStraights, run.outletWidth,
             run.outletHeight, run.level, run.side, run.neck, run.diffuserModel, run.neckDimensions];
-        const key = JSON.stringify([type, ...shape, material, insulation, artilon, hb, reinforcementWidth, memo]);
+        const key = JSON.stringify([type, ...shape, material, insulation, artilon, voltage, phase, reinforcementWidth, memo]);
         const item = items.get(key);
         if (item) item.quantity += piece.quantity;
         else items.set(key, { ...run, type, ...piece, plate: plateThickness(material, run) });
@@ -209,12 +198,10 @@ const orderCalculations = (() => {
     const missing = [];
     if (item.type === 'offset' && item.length > offsetMaxLength) missing.push('고바이 총길이 L');
     if (isCatalogItem(item.type) && spiralCatalog.get(item.model)?.checkCombination) missing.push('제조사 지름 조합');
-    if (item.insulation === 'artilon' && !item.artilon) missing.push('아티론 두께');
-    if (item.insulation !== 'none' && !item.hb) missing.push('HB');
     return missing;
   }
 
   return { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels,
-    format, positiveInteger, hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, splitRun, hbKey,
+    format, positiveInteger, hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, splitRun,
     insulationText, specText, crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, orderPieces, orderQuantity, quantityText, compareItems, orderItems, missingDetails };
 })();

@@ -2,16 +2,17 @@
 
 (() => {
   const { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels, format, positiveInteger,
-    hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, hbKey, insulationText, specText,
+    hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, insulationText, specText,
     crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, splitRun, orderPieces, orderQuantity, quantityText, compareItems, orderItems, missingDetails } = orderCalculations;
   const storageKey = 'hanguk-duct-order-v1';
   const byId = id => document.getElementById(id);
   const form = byId('entry-form');
   const info = byId('order-info');
   const infoLabels = { site: '현장명', supplier: '수신처', orderDate: '발주일', deliveryDate: '납품일', contact: '담당 / 연락처', address: '납품 장소' };
+  const officeDeliveryAddress = '경기도 고양시 일산동구 장대길 160-50 한국닥트';
   const draftFields = ['type', 'width', 'height', 'neck', 'diffuserNominal', 'diffuserModel', 'length', 'cutLength', 'radius', 'rise', 'offsetLength', 'includeInlet', 'inlet', 'repeat',
     'outletWidth', 'outletHeight', 'reducerLength', 'level', 'side',
-    'material', 'insulation', 'artilon', 'hb', 'reinforcement', 'reinforcementSize', 'customReinforcement', 'memo'];
+    'material', 'insulation', 'voltage', 'phase', 'reinforcement', 'reinforcementSize', 'customReinforcement', 'memo'];
   const fields = Object.fromEntries(draftFields.map(name => [name, form.elements.namedItem(name)]));
   const spiral = mountSpiralEntry();
   const partGroups = {
@@ -23,9 +24,11 @@
   };
   const choiceDefaults = { material: 'galvanized', insulation: 'none', reinforcement: 'no', level: 'center', side: 'center' };
   const supportsReinforcement = type => type === 'straight' || Boolean(elbowAngles[type]);
+  const isMotorDamper = ({ type, model }) => ['mvd', 'mfd'].includes(type === 'spiral' ? spiralCatalog.get(model)?.damper : type);
+  const motorPowerText = ({ voltage, phase }) => [voltage, phase].filter(Boolean).join(' ');
   const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format();
   const historyDate = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' });
-  const newState = (hb, records = [], drafts = []) => ({ meta: { orderDate: today() }, runs: [], hb, draft: {}, records, drafts,
+  const newState = (records = [], drafts = []) => ({ meta: { orderDate: today() }, runs: [], draft: {}, records, drafts,
     activeRecordId: null, activeDraftId: null });
   const dimensions = () => {
     const diffuser = diffusers[fields.type.value];
@@ -42,7 +45,6 @@
   let storageIssue = '';
   let state = loadState();
   let editingId = null;
-  let lastHbContext = '';
   let items = [];
   let legacyDiffuserType;
   const mobilePdf = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
@@ -52,22 +54,23 @@
   function loadState() {
     try {
       const raw = localStorage.getItem(storageKey);
-      if (!raw) return newState({});
+      if (!raw) return newState();
       const data = JSON.parse(raw);
-      if (data && Array.isArray(data.runs) && data.meta && data.hb && data.draft) {
-        return { ...newState({}), ...data, records: Array.isArray(data.records) ? data.records : [],
+      if (data && Array.isArray(data.runs) && data.meta && data.draft) {
+        return { ...newState(), ...data, records: Array.isArray(data.records) ? data.records : [],
           drafts: Array.isArray(data.drafts) ? data.drafts : [] };
       }
       throw new Error('Invalid saved order');
     } catch (error) {
       storageIssue = '이전 작업을 불러올 수 없습니다.';
-      return newState({});
+      return newState();
     }
   }
 
   function currentDraft() {
     const draft = { ...Object.fromEntries(draftFields.map(name => [name, fields[name].value])), editingId };
     if (isCatalogItem(fields.type.value)) draft.spiral = spiral.read();
+    if (byId('damper-power').disabled) draft.voltage = draft.phase = '';
     if (!diffusers[draft.type]) {
       draft.diffuserNominal = '';
       draft.diffuserModel = '';
@@ -113,6 +116,7 @@
 
   function currentOrder() {
     const meta = Object.fromEntries(Object.keys(infoLabels).map(name => [name, state.meta[name] || '']));
+    if (state.meta.siteDeliveryAddress) meta.siteDeliveryAddress = state.meta.siteDeliveryAddress;
     return { meta, runs: state.runs, draft: currentDraft() };
   }
 
@@ -270,7 +274,7 @@
     const records = deletingDraft ? state.records : state.records.filter(item => item.id !== id);
     const drafts = deletingDraft ? state.drafts.filter(item => item.id !== id)
       : state.drafts.map(item => item.recordId === id ? { ...item, recordId: null } : item);
-    state = resetForm ? newState(state.hb, records, drafts)
+    state = resetForm ? newState(records, drafts)
       : { ...state, records, drafts, activeRecordId: removingActiveRecord ? null : state.activeRecordId };
     if (resetForm) restoreOrderForm();
 
@@ -294,11 +298,10 @@
   }
 
   function readConditions(geometry) {
-    if (isAirOutlet(geometry.type) || geometry.type === 'flex') return { material: null, insulation: 'none', artilon: null };
+    if (isAirOutlet(geometry.type) || geometry.type === 'flex') return { material: null, insulation: 'none' };
     const insulation = fields.insulation.value || choiceDefaults.insulation;
     const material = isCatalogItem(geometry.type) ? geometry.material : fields.material.value;
-    return { material: material || choiceDefaults.material, insulation,
-      artilon: insulation === 'artilon' && Number(fields.artilon.value) > 0 ? Number(fields.artilon.value) : null };
+    return { material: material || choiceDefaults.material, insulation };
   }
 
   function wasManualDiffuser(values) {
@@ -447,6 +450,8 @@
     byId('branch-outlet').textContent = branch && hasOutletDimensions(geometry) ? outletSectionText(geometry) : '—';
     byId('damper-length').hidden = !damper;
     byId('damper-length-value').textContent = `${format(damperLength)} mm`;
+    const power = byId('damper-power');
+    power.hidden = power.disabled = !isMotorDamper(geometry);
     byId('rect-material-section').hidden = round || airOutlet;
     byId('rect-material-options').disabled = round || airOutlet;
     byId('insulation-section').hidden = airOutlet || type === 'flex';
@@ -517,7 +522,7 @@
     byId('fitting-caption').textContent = caption;
   }
 
-  function syncForm(restoreHb = false) {
+  function syncForm() {
     const round = isCatalogItem(fields.type.value);
     spiral.sync(fields.type.value);
     syncDiffuser();
@@ -528,30 +533,9 @@
     const section = round ? (validGeometry(geometry) ? geometry : null)
       : size && (!twoEnds || hasOutletDimensions(geometry)) ? { ...size, ...geometry } : null;
     const conditions = readConditions(geometry);
-    const useInsulation = ['rubber', 'artilon'].includes(conditions.insulation);
-    const isArtilon = conditions.insulation === 'artilon';
     const allowReinforcement = supportsReinforcement(geometry.type);
     const useReinforcement = allowReinforcement && fields.reinforcement.value === 'yes';
     const customReinforcement = useReinforcement && fields.reinforcementSize.value === 'custom';
-    const key = section && useInsulation ? hbKey({ ...section, ...conditions }) : '';
-    const context = section && useInsulation ? hbKey({ ...section, ...conditions, artilon: conditions.artilon ?? 'unknown' }) : '';
-    const registeredHb = key ? state.hb[key] : '';
-
-    byId('insulation-fields').hidden = !useInsulation;
-    byId('artilon-field').hidden = !isArtilon;
-    fields.artilon.disabled = !isArtilon;
-    fields.hb.disabled = !section || !useInsulation;
-    fields.artilon.setCustomValidity(fields.artilon.value && Number(fields.artilon.value) <= 0 ? '두께는 0보다 커야 합니다.' : '');
-    if (context !== lastHbContext && !restoreHb) fields.hb.value = registeredHb || '';
-    lastHbContext = context;
-
-    const hint = byId('hb-hint');
-    if (!section) hint.textContent = round ? '제품 모델과 치수를 먼저 선택하세요.'
-      : twoEnds ? '양쪽 단면의 가로와 세로를 확인하세요.' : '가로와 세로를 먼저 입력하세요.';
-    else if (!key) hint.textContent = '아티론 두께를 입력하면 같은 조건의 HB값을 다시 불러올 수 있습니다.';
-    else if (registeredHb && fields.hb.value === registeredHb) hint.textContent = '같은 규격·보온 조건에 저장된 HB값입니다.';
-    else hint.textContent = '확인한 HB값은 같은 규격·보온 조건에 자동으로 불러옵니다.';
-
     byId('reinforcement-choice').hidden = !allowReinforcement;
     byId('reinforcement-choice').disabled = !allowReinforcement;
     byId('reinforcement-fields').hidden = !useReinforcement;
@@ -648,21 +632,34 @@
     byId('add-entry').textContent = id ? '변경사항 적용' : '발주에 추가';
     byId('cancel-edit').hidden = !id;
     setMessage('');
-    syncForm(true);
+    syncForm();
   }
 
   function restoreInfo() {
-    for (const input of info.querySelectorAll('input')) input.value = state.meta[input.name] || '';
+    for (const input of info.querySelectorAll('input:not([type="radio"])')) input.value = state.meta[input.name] || '';
+    restoreDeliveryAddress();
+  }
+
+  function restoreDeliveryAddress() {
+    const office = state.meta.address === officeDeliveryAddress;
+    byId('deliver-office').checked = office;
+    byId('deliver-site').checked = !office;
+    byId('delivery-address').hidden = office;
+    byId('delivery-address').value = state.meta.address || '';
+    const officeAddress = byId('office-address');
+    officeAddress.textContent = officeDeliveryAddress;
+    officeAddress.hidden = !office;
   }
 
   function rowNotes(item) {
     const notes = [];
+    const power = motorPowerText(item);
+    if (power) notes.push({ text: `전원 ${power}` });
     if (item.type === 'flex') {
       const insulation = spiralCatalog.get(item.model).insulationLabel;
       if (insulation !== '미사용') notes.push({ text: `보온재 ${insulation}` });
     } else if (item.insulation && item.insulation !== 'none') {
       notes.push({ text: `보온재 ${insulationText(item)}` });
-      if (item.hb) notes.push({ text: `HB ${item.hb}` });
     }
     if (item.reinforcementWidth) notes.push({ text: `갈바보강 ${format(item.reinforcementWidth)} mm` });
     const missing = missingDetails(item);
@@ -757,6 +754,8 @@
       const type = ductType(run);
       const details = isAirOutlet(type) || type === 'flex' ? []
         : [materials[run.material].label, insulationText(run), run.reinforcementWidth ? `보강 ${format(run.reinforcementWidth)} mm` : '보강 미설치'];
+      const power = motorPowerText(run);
+      if (power) details.push(`전원 ${power}`);
       const quantity = type === 'flex' ? ` · ${format(orderQuantity(run))} 박스`
         : run.repeat > 1 ? ` · ${format(run.repeat)}${type === 'straight' || isCatalogItem(type) && spiralCatalog.isStock(run.model) ? '구간' : ` ${itemUnit(run)}`}` : '';
       const spec = type === 'straight' ? crossSectionText(run) : specText(run);
@@ -907,9 +906,12 @@
       return;
     }
     const run = { id: editingId || crypto.randomUUID(), ...size, ...geometry, repeat, ...conditions,
-      hb: conditions.insulation === 'none' ? '' : fields.hb.value.trim(), reinforcementWidth, memo: fields.memo.value.trim() };
-    const key = hbKey(run);
-    if (key && run.hb) state.hb[key] = run.hb;
+      reinforcementWidth, memo: fields.memo.value.trim() };
+    if (conditions.insulation === 'artilon' && previous?.artilon) run.artilon = previous.artilon;
+    if (isMotorDamper(geometry)) {
+      if (fields.voltage.value) run.voltage = fields.voltage.value;
+      if (fields.phase.value) run.phase = fields.phase.value;
+    }
     const wasEditing = Boolean(editingId);
     if (wasEditing) state.runs = state.runs.map(previous => previous.id === editingId ? run : previous);
     else state.runs.push(run);
@@ -961,13 +963,23 @@
   });
 
   info.addEventListener('input', event => {
-    state.meta[event.target.name] = event.target.value.trim();
+    const { name, value } = event.target;
+    if (name === 'deliveryDestination') {
+      if (value === 'office') {
+        if (state.meta.address && state.meta.address !== officeDeliveryAddress) state.meta.siteDeliveryAddress = state.meta.address;
+        state.meta.address = officeDeliveryAddress;
+      } else {
+        state.meta.address = state.meta.siteDeliveryAddress || '';
+        delete state.meta.siteDeliveryAddress;
+      }
+      restoreDeliveryAddress();
+    } else state.meta[name] = value.trim();
     saveState();
   });
 
   async function clearOrder(action) {
     if (!await confirmSave(action)) return;
-    state = newState(state.hb, state.records, state.drafts);
+    state = newState(state.records, state.drafts);
     fillForm();
     restoreInfo();
     saveState();
