@@ -23,7 +23,7 @@
     </header>
 
     <main class="page-width">
-      <div class="page-heading">
+      <div id="order-top" class="page-heading" tabindex="-1">
         <div>
           <h1>발주서</h1>
           <p>직관과 부속의 치수, 제작 조건을 입력해 발주서를 작성하세요.</p>
@@ -50,7 +50,7 @@
       </section>
 
       <div class="workspace-grid">
-        <section class="card entry" aria-labelledby="entry-title">
+        <section id="order-entry-panel" class="card entry" aria-labelledby="entry-title" tabindex="-1">
           <div class="section-heading">
             <h2 id="entry-title">덕트 품목 입력</h2>
             <span class="unit-note">치수 단위 mm</span>
@@ -301,7 +301,7 @@
             <div id="cut-preview" aria-live="polite"></div>
           </section>
 
-          <section class="card order-items" aria-labelledby="items-title">
+          <section id="order-items-panel" class="card order-items" aria-labelledby="items-title" tabindex="-1">
             <div class="section-heading"><h2 id="items-title">발주 품목</h2><span id="order-size" class="unit-note">0개 품목 · 총 0 EA</span></div>
             <p id="order-warning" class="notice" role="status" hidden></p>
             <div id="empty-order" class="empty-order">
@@ -317,7 +317,7 @@
             <ul id="run-list"></ul>
           </section>
         </div>
-        <aside id="order-history" class="card order-history" aria-labelledby="history-title">
+        <aside id="order-history" class="card order-history" aria-labelledby="history-title" tabindex="-1">
           <div class="section-heading">
             <h2 id="history-title" tabindex="-1">발주 기록</h2>
             <span id="history-count" class="unit-note">0건</span>
@@ -338,6 +338,12 @@
         </aside>
       </div>
     </main>
+    <nav class="mobile-order-nav" aria-label="모바일 발주서 바로 가기">
+      <a href="#order-top">발주 정보</a>
+      <a href="#order-entry-panel">품목 입력</a>
+      <a href="#order-items-panel">발주 품목</a>
+      <a href="#order-history">발주 기록</a>
+    </nav>
   </div>
 
   <dialog id="save-dialog" class="order-dialog" aria-labelledby="save-dialog-title">
