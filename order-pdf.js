@@ -7,6 +7,7 @@ const orderPdf = (() => {
   const margin = 44;
   const contentWidth = pageWidth - margin * 2;
   const columnWidths = [43, 96, 153, 100, 43, 52, 105, 114];
+  const diagramWidth = 340;
   const colors = { ink: '#172c24', brand: '#255440', muted: '#4d6157', line: '#aebbb1', tint: '#e8f0e9',
     warning: '#824313', warningTint: '#f7eee1' };
   const fontFamily = 'system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
@@ -155,7 +156,7 @@ const orderPdf = (() => {
 
     const table = sheet.querySelector('table');
     const headings = Array.from(table.tHead.rows[0].cells, (cell, index) => cellLines(ctx, cell, columnWidths[index] - 14));
-    const rows = Array.from(table.tBodies[0].rows);
+    const rows = Array.from(table.querySelectorAll('tbody > tr:not(.order-offset-diagram)'));
     const info = Array.from(sheet.querySelector('.print-info').children, row => Array.from(row.children, cell => cell.textContent));
     const title = sheet.querySelector('h1').textContent;
     const brand = sheet.querySelector('.print-brand').textContent;
@@ -198,13 +199,21 @@ const orderPdf = (() => {
     for (const [index, row] of rows.entries()) {
       const columns = Array.from(row.cells, (cell, column) => cellLines(ctx, cell, columnWidths[column] - 14));
       const height = 14 + 17 * Math.max(1, ...columns.map(lines => lines.length));
+      const diagram = row.nextElementSibling?.querySelector('canvas');
+      const diagramHeight = diagram ? (diagram.height / diagram.width) * diagramWidth + 12 : 0;
       const totalHeight = index === rows.length - 1 ? 31 : 0;
-      if (top + height + totalHeight > pageHeight - 63) {
+      if (top + height + diagramHeight + totalHeight > pageHeight - 63) {
         await finishPage();
         top = startPage();
       }
       drawRow(ctx, columns, top, height);
       top += height;
+      if (diagram) {
+        ctx.strokeStyle = colors.line;
+        ctx.strokeRect(margin, top, contentWidth, diagramHeight);
+        ctx.drawImage(diagram, margin + (contentWidth - diagramWidth) / 2, top + 6, diagramWidth, diagramHeight - 12);
+        top += diagramHeight;
+      }
     }
 
     textStyle(ctx, 14, true, colors.brand);

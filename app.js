@@ -689,9 +689,10 @@
       heading.scope = 'col';
       headerRow.append(heading);
     }
-    const body = table.createTBody();
-    if (!print) body.setAttribute('role', 'rowgroup');
+    const screenBody = print ? null : table.createTBody();
+    screenBody?.setAttribute('role', 'rowgroup');
     for (const [index, item] of items.entries()) {
+      const body = screenBody ?? table.createTBody();
       const [spec, material, thickness, insulation, hb, reinforcement, notes] = rowData(item);
       const row = body.insertRow();
       if (print) {
@@ -733,6 +734,18 @@
             cell.prepend(mobileLabel);
           }
         }
+      }
+      if (item.type === 'offset') {
+        const diagramRow = body.insertRow();
+        diagramRow.className = 'order-offset-diagram';
+        const diagramCell = diagramRow.insertCell();
+        diagramCell.colSpan = headers.length;
+        const canvas = el('canvas');
+        canvas.width = 800;
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', `고바이 도면. ${crossSectionText(item)} mm, ${offsetDetails(item)}`);
+        diagramCell.append(canvas);
+        drawFittingDiagram(canvas, item, item, positiveInteger(item.inlet) ? 'yes' : 'no');
       }
     }
     return table;

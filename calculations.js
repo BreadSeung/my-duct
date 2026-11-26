@@ -114,8 +114,8 @@ const orderCalculations = (() => {
   }
 
   function offsetDetails({ rise, length, inlet, equalEndStraights }) {
-    const straights = inlet === null ? 'C 미적용' : `C${format(inlet)}${equalEndStraights ? ' (양쪽)' : ''}`;
-    return `H${format(rise)} · L${format(length)} · ${straights}`;
+    const main = `H${format(rise)} · L${format(length)}`;
+    return positiveInteger(inlet) ? `${main} · C${format(inlet)}${equalEndStraights ? ' (양쪽)' : ''}` : main;
   }
 
   const crossSectionText = ({ width, height }) => `${format(width)} × ${format(height)}`;

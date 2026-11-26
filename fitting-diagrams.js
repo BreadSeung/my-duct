@@ -320,7 +320,7 @@ function drawFittingDiagram(canvas, geometry, size, includeInlet) {
   const riseLine = right + 19;
   const straightSpan = drawInlet ? span * Math.min(0.49, geometry.inlet / length) : 0;
   const knee = left + straightSpan;
-  const endBend = right - straightSpan;
+  const endBend = geometry.equalEndStraights ? right - straightSpan : right;
   const bendSpan = endBend - knee;
 
   // The end view shows the rectangular section that is hidden in the side profile.
@@ -363,6 +363,7 @@ function drawFittingDiagram(canvas, geometry, size, includeInlet) {
   label(value('H', geometry.rise), riseLine + 7, (rightBottom + leftBottom) / 2, 'left');
   if (drawInlet) {
     for (const [start, end, top] of [[left, knee, lowTop], [endBend, right, highTop]]) {
+      if (start === end) continue;
       line([[start, top - 4], [start, top - 18]]);
       line([[end, top - 4], [end, top - 18]]);
       if (straightSpan >= 13) dimension(start, top - 15, end, top - 15);
