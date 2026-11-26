@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "cp '각형덕트 발주.html' index.html",
+  "outputDirectory": "."
+}
