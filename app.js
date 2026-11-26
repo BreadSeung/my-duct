@@ -19,7 +19,7 @@
     spiral: { button: byId('choose-spiral'), picker: byId('spiral-part-picker'), type: 'spiral' },
     outlet: { button: byId('choose-outlet'), picker: byId('outlet-part-picker'), type: 'grille' }
   };
-  const choiceDefaults = { insulation: 'none', reinforcement: 'no' };
+  const choiceDefaults = { material: 'galvanized', insulation: 'none', reinforcement: 'no' };
   const supportsReinforcement = type => type === 'straight' || Boolean(elbowAngles[type]);
   const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format();
   const historyDate = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' });
@@ -116,7 +116,8 @@
 
   function hasWork({ meta, runs, draft }) {
     const round = draft.spiral;
-    const spiralWork = round && (round.model !== 'SP' || round.material !== 'galvanized' || round.spiralThickness
+    const spiralWork = round && (round.model !== 'SP' || round.material !== choiceDefaults.material
+      || (round.spiralThickness != null && round.spiralThickness !== spiralCatalog.defaultThickness)
       || round.params.d1 || round.params.runLength || round.params.length !== 4000);
     return runs.length || Object.keys(infoLabels).some(name => name !== 'orderDate' && meta[name])
       || (meta.orderDate || '') !== today()
@@ -292,7 +293,8 @@
   function readConditions(geometry) {
     if (isAirOutlet(geometry.type)) return { material: null, insulation: 'none', artilon: null };
     const insulation = fields.insulation.value || choiceDefaults.insulation;
-    return { material: geometry.type === 'spiral' ? geometry.material : fields.material.value, insulation,
+    const material = geometry.type === 'spiral' ? geometry.material : fields.material.value;
+    return { material: material || choiceDefaults.material, insulation,
       artilon: insulation === 'artilon' && Number(fields.artilon.value) > 0 ? Number(fields.artilon.value) : null };
   }
 

@@ -8,7 +8,7 @@ const orderCalculations = (() => {
   const branchWidening = 150;
   const thickThreshold = 750;
   const materials = {
-    galvanized: { label: '아연도강판', thinLimit: 450 },
+    galvanized: { label: '아연도금강판', thinLimit: 450 },
     galvalume: { label: '갈바륨' },
     sts201: { label: 'STS 201', thinLimit: thickThreshold },
     sts304: { label: 'STS 304', thinLimit: thickThreshold },

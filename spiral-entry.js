@@ -9,13 +9,29 @@ function mountSpiralEntry() {
   const box = document.getElementById('spiral-dimensions');
   const material = document.getElementById('spiral-material');
   const thickness = document.getElementById('spiral-thickness');
+  const { thicknessChoices, defaultThickness } = spiralCatalog;
   const note = document.getElementById('spiral-note');
   const reference = document.getElementById('spiral-reference');
   let activeModel;
   let controls = new Map();
   let legacyChoice;
+  let legacyThickness;
   const choices = new Map();
   const labels = { SP: '직관', EB45: '45° 엘보', EB90: '90° 엘보', CPM: '커플링', TO: '테이크오프' };
+
+  for (const value of thicknessChoices) {
+    thickness.append(new Option(`${value}T`, value, value === defaultThickness));
+  }
+
+  function restoreThickness(value = defaultThickness) {
+    legacyThickness?.remove();
+    legacyThickness = undefined;
+    if (value === null || (Number.isFinite(value) && value > 0 && !thicknessChoices.includes(value))) {
+      legacyThickness = new Option(value === null ? '제품 표준 (기존 발주)' : `${value}T (기존 발주)`, value ?? '');
+      thickness.append(legacyThickness);
+    }
+    thickness.value = legacyThickness ? legacyThickness.value : String(thicknessChoices.includes(value) ? value : defaultThickness);
+  }
 
   function makeChoice(model, label) {
     const button = document.createElement('button');
@@ -42,6 +58,10 @@ function mountSpiralEntry() {
   picker.addEventListener('click', event => {
     const button = event.target.closest('button[data-model]');
     if (!button || button.dataset.model === activeModel.id) return;
+    if (legacyThickness) {
+      const selected = Number(thickness.value);
+      restoreThickness(thicknessChoices.includes(selected) ? selected : defaultThickness);
+    }
     selectModel(spiralCatalog.get(button.dataset.model));
     picker.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -119,13 +139,12 @@ function mountSpiralEntry() {
 
   function read() {
     return { type: 'spiral', model: activeModel.id, params: readParams(), material: material.value,
-      spiralThickness: thickness.value ? Number(thickness.value) : null };
+      spiralThickness: legacyThickness?.selected && !thickness.value ? null : Number(thickness.value || defaultThickness) };
   }
 
   function sync(enabled) {
     section.hidden = !enabled;
     section.disabled = !enabled;
-    thickness.setCustomValidity('');
     if (!enabled) return;
     const model = activeModel;
     updateOptions();
@@ -135,12 +154,6 @@ function mountSpiralEntry() {
     if (model.shape.startsWith('elbow') || model.shape === 'twin' && model.page === 5) details.push('제조사 표에 반경 R 수치가 없습니다.');
     if (model.code === 'SP') details.push('전체 길이에 맞춰 정척으로 나누고, 남는 치수는 정척 한 본을 추가합니다.');
     if (model.fixedLength) details.push(`제작 길이 L ${format(model.fixedLength)} mm (고정)`);
-    const band = spiralCatalog.thicknessBand(item);
-    if (band) {
-      const sizes = band.choices ? band.choices.join(' / ') : `${band.min}–${band.max}`;
-      details.push(`이 지름의 표기 판두께 ${sizes} T`);
-      if (!spiralCatalog.validThickness(item)) thickness.setCustomValidity(`이 지름의 판두께는 ${sizes} T 범위에서 지정하세요.`);
-    }
     note.textContent = details.join(' · ');
     note.hidden = !details.length;
     reference.hidden = !model.page;
@@ -150,7 +163,7 @@ function mountSpiralEntry() {
   function restore(values) {
     const model = spiralCatalog.get(values?.model) || spiralCatalog.get('SP');
     material.value = values?.material || 'galvanized';
-    thickness.value = values?.spiralThickness ?? '';
+    restoreThickness(values?.spiralThickness);
     selectModel(model);
     for (const [key, value] of Object.entries(values?.params || {})) {
       if (!controls.has(key) || value === null) continue;

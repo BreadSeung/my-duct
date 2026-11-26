@@ -126,7 +126,7 @@
                     <option value="galvalume">갈바륨</option>
                     <option value="sts304">STS 304</option>
                   </select></label>
-                  <label>판두께 (T)<input id="spiral-thickness" name="spiralThickness" type="number" min="0.01" step="any" inputmode="decimal" placeholder="제품 표준"></label>
+                  <label>판두께 (T)<select id="spiral-thickness" name="spiralThickness"></select></label>
                 </div>
                 <p id="spiral-note" class="field-hint" aria-live="polite"></p>
                 <a id="spiral-reference" target="_blank" rel="noopener noreferrer">제조사 규격표</a>
@@ -202,7 +202,7 @@
               <fieldset id="rect-material-options">
                 <legend>강판 재질</legend>
                 <div class="choices">
-                  <label><input type="radio" name="material" value="galvanized" required><span>아연도강판</span></label>
+                  <label><input type="radio" name="material" value="galvanized" checked required><span>아연도금강판</span></label>
                   <label><input type="radio" name="material" value="sts201" required><span>STS 201</span></label>
                   <label><input type="radio" name="material" value="sts304" required><span>STS 304</span></label>
                 </div>
@@ -214,7 +214,7 @@
               <details class="plate-guide">
                 <summary>판두께 적용 기준</summary>
                 <table>
-                  <thead><tr><th scope="col">판두께</th><th scope="col">아연도강판 장변</th><th scope="col">STS 201·304 장변</th></tr></thead>
+                  <thead><tr><th scope="col">판두께</th><th scope="col">아연도금강판 장변</th><th scope="col">STS 201·304 장변</th></tr></thead>
                   <tbody>
                     <tr><th scope="row">0.5T</th><td>450 이하</td><td>750 이하</td></tr>
                     <tr><th scope="row">0.6T</th><td>451–750</td><td>—</td></tr>

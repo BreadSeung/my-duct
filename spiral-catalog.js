@@ -11,12 +11,8 @@ const spiralCatalog = (() => {
     1350, 1400, 1450, 1500];
   const pressedElbows = [75, 80, 100, 125, 150, 160, 175, 180, 200, 250, 300];
   const pressedCaps = [100, 125, 150, 200, 250, 300];
-  const ductThicknessBands = [
-    { through: 125, choices: [0.5] }, { through: 180, choices: [0.5, 0.6] },
-    { through: 475, min: 0.5, max: 1.6 }, { through: 525, min: 0.5, max: 2 },
-    { through: 750, min: 0.6, max: 2 }, { through: 1000, min: 0.8, max: 2 },
-    { through: 1500, min: 1, max: 2 }, { through: 1900, min: 1.45, max: 2 }, { through: 2500, min: 1.6, max: 2 },
-  ];
+  const thicknessChoices = Object.freeze([0.5, 0.6, 0.8]);
+  const defaultThickness = 0.6;
   const elbow90 = { 200: 200, 250: 250, 300: 300, 400: 400, 450: 450, 500: 500, 600: 600, 800: 800,
     900: 900, 1000: 1000, 1250: 1250 };
   const elbow45 = { 200: 83, 250: 104, 300: 124, 400: 162, 450: 186, 500: 204, 600: 249, 800: 331,
@@ -133,25 +129,14 @@ const spiralCatalog = (() => {
   function valid(item) {
     const model = models.get(item.model);
     if (!model || !item.params) return false;
-    return validThickness(item) && model.fields.every(field => {
+    const thickness = item.spiralThickness;
+    // Older orders can still carry a manually entered thickness or a product standard.
+    if (thickness !== null && (!Number.isFinite(thickness) || thickness <= 0)) return false;
+    return model.fields.every(field => {
       const value = item.params[field.key];
       const options = optionsFor(model, field, item.params);
       return options ? options.includes(value) : Number.isSafeInteger(value) && value > 0;
     });
-  }
-
-  function thicknessBand(item) {
-    if (item.model !== 'SP' || !ductDiameters.includes(item.params.d1)) return null;
-    return ductThicknessBands.find(band => item.params.d1 <= band.through);
-  }
-
-  function validThickness(item) {
-    const value = item.spiralThickness;
-    if (value === null) return true;
-    if (!Number.isFinite(value) || value <= 0) return false;
-    const band = thicknessBand(item);
-    if (!band) return true;
-    return band.choices ? band.choices.includes(value) : value >= band.min && value <= band.max;
   }
 
   function spec(item, format) {
@@ -179,5 +164,6 @@ const spiralCatalog = (() => {
     return entries;
   }
 
-  return { orderModels, isOrderModel, get: id => models.get(id), optionsFor, valid, validThickness, thicknessBand, spec, details, flangeOptions };
+  return { orderModels, isOrderModel, get: id => models.get(id), optionsFor, valid, spec, details, flangeOptions,
+    thicknessChoices, defaultThickness };
 })();
