@@ -138,7 +138,7 @@ const orderCalculations = (() => {
         ? item.diffuserModel.split(' ').at(-1)
         : `전면 ${diffuserFaceText(type, item.width, item.height)} / 목 Ø${format(item.neck)}`;
     }
-    if (isAirOutlet(type)) return item.neckDimensions ? `목 ${section}` : section;
+    if (isAirOutlet(type)) return section;
     if (type === 'offset') return `${section} / ${offsetDetails(item)}`;
     if (hasTwoEnds(type)) return `${section} → ${outletSectionText(item)} / ${twoEndDetails(item)}`;
     if (elbowAngles[type]) return `${section} × R${format(radius)}`;
