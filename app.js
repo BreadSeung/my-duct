@@ -476,7 +476,8 @@
             : [[field.label, value]];
         });
       if (model.fixedLength) measurements.push(['L', model.fixedLength]);
-      const values = [measurementDescription(measurements),
+      const values = [geometry.params.orientation ? `${geometry.params.orientation}형` : '',
+        measurementDescription(measurements),
         catalogStock ? byId('stock-label').textContent : ''].filter(Boolean).join(', ');
       diagram.setAttribute('aria-label', values ? `${model.name} 치수 안내 그림. ${values}` : `${model.name} 치수 안내 그림`);
       const code = type === 'oval' ? ovalCatalog.code(model, geometry.params) : type === 'spiral' && !model.damper ? model.code : '';

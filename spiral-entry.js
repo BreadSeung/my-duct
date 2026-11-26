@@ -85,7 +85,7 @@ function mountSpiralEntry() {
     if (control.dataset.choices === signature) return;
     const previous = control.value;
     control.dataset.choices = signature;
-    control.replaceChildren(new Option(options.length ? '선택' : '호칭 지름 먼저 선택', ''));
+    control.replaceChildren(new Option(options.length ? '선택' : '호칭 먼저 선택', ''));
     for (const value of options) {
       const label = field.optionLabels?.[value] ?? (field.key === 'flange' ? spiralCatalog.flangeOptions[value]
         : field.key === 'length' ? spiralCatalog.stockLengthText(value) : field.ovalDepth
@@ -257,7 +257,7 @@ function drawSpiralThumbnail(canvas, shape) {
   drawSpiralProfile(context, shape);
 }
 
-function drawSpiralProfile(context, shape) {
+function drawSpiralProfile(context, shape, elbowWidth = 41) {
   const edge = '#345448';
   const seam = '#527266';
   context.lineJoin = 'round';
@@ -500,8 +500,8 @@ function drawSpiralProfile(context, shape) {
 
   const turn = shape === 'elbow90' ? 90 : 45;
   const divisions = turn === 90 ? 4 : 3;
-  const inner = 40;
   const outer = 81;
+  const inner = outer - elbowWidth;
   const center = [152, 93];
   const angles = Array.from({ length: divisions + 1 }, (_, index) => Math.PI + index * turn * Math.PI / (180 * divisions));
   const point = (radius, angle) => [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
@@ -529,13 +529,17 @@ function drawSpiralDiagram(canvas, model, params) {
   const { format, positiveInteger } = orderCalculations;
   const context = canvas.getContext('2d');
   if (!context) return;
-  canvas.height = 272;
+  const shape = model.shape;
+  const oval = model.type === 'oval';
+  const ovalElbows = oval && (shape === 'elbow90' || shape === 'elbow45');
+  const ovalEnds = oval ? model.fields.filter(field => field.diameter) : [];
+  const drawingHeight = ovalElbows ? 170 : oval ? Math.max(150, 16 + ovalEnds.length * 65) : 136;
+  canvas.height = drawingHeight * 2;
   context.setTransform(2, 0, 0, 2, 0, 0);
-  context.clearRect(0, 0, 400, 136);
+  context.clearRect(0, 0, 400, drawingHeight);
   context.lineJoin = 'round';
   context.lineCap = 'round';
-  const shape = model.shape;
-  const size = (symbol, value) => positiveInteger(value) ? `${symbol}${format(value)}` : symbol;
+  const size = (symbol, value) => positiveInteger(value) ? `${symbol}${format(value)}` : symbol.trim();
   const diameter = (key, fallback = `Ø${key}`) => positiveInteger(params[key]) ? size('Ø', params[key]) : fallback;
 
   function outline(points, close = false) {
@@ -571,36 +575,91 @@ function drawSpiralDiagram(canvas, model, params) {
     return;
   }
 
-  if (model.type === 'oval') {
+  if (oval) {
     const [left, top, width, height] = spiralProfileFrames[shape];
-    const scale = Math.min(146 / width, 94 / height);
-    context.save();
-    context.translate(98 - (left + width / 2) * scale, 64 - (top + height / 2) * scale);
-    context.scale(scale, scale);
-    drawSpiralProfile(context, shape);
-    context.restore();
-    const ends = model.fields.filter(field => field.diameter);
-    for (const [index, field] of ends.entries()) {
-      const y = (136 / ends.length) * (index + 0.5) - 4;
-      const oval = field.ovalEnd;
-      const depth = params[`depth${oval}`];
-      const width = ovalCatalog.widthFor(params[field.key], depth);
-      const vertical = params.orientation === 'V';
-      const [w, h] = oval ? vertical ? [12, 34] : [40, 13] : [23, 23];
+    function drawProfile(x, y, maxWidth, maxHeight, elbowWidth) {
+      const scale = Math.min(maxWidth / width, maxHeight / height);
+      context.save();
+      context.translate(x - (left + width / 2) * scale, y - (top + height / 2) * scale);
+      context.scale(scale, scale);
+      drawSpiralProfile(context, shape, elbowWidth);
+      context.restore();
+    }
+
+    function drawSection(x, y, w, h, across, upright) {
+      const left = x - w / 2;
+      const right = x + w / 2;
+      const top = y - h / 2;
+      const bottom = y + h / 2;
       context.beginPath();
-      context.roundRect(207 - w / 2, y - h / 2, w, h, Math.min(w, h) / 2);
+      context.roundRect(left, top, w, h, Math.min(w, h) / 2);
       context.fillStyle = '#dcece3';
       context.fill();
       context.strokeStyle = '#233f35';
       context.lineWidth = 1.5;
       context.stroke();
-      const name = field.label.split(' ')[0];
-      const nominal = diameter(field.key);
-      const dimensions = oval ? ` · ${size('D', depth)} × ${size('W', width)}` : '';
-      label(`${name} ${nominal}${dimensions}`, 310, y + 4);
+      const baseline = bottom + 8;
+      outline([[left, bottom + 2], [left, baseline + 3]]);
+      outline([[right, bottom + 2], [right, baseline + 3]]);
+      outline([[left, baseline], [right, baseline]]);
+      outline([[left + 4, baseline - 2], [left, baseline], [left + 4, baseline + 2]]);
+      outline([[right - 4, baseline - 2], [right, baseline], [right - 4, baseline + 2]]);
+      label(across, x, baseline + 13);
+      if (!upright) return;
+      const axis = right + 8;
+      outline([[right + 2, top], [axis + 3, top]]);
+      outline([[right + 2, bottom], [axis + 3, bottom]]);
+      outline([[axis, top], [axis, bottom]]);
+      outline([[axis - 2, top + 4], [axis, top], [axis + 2, top + 4]]);
+      outline([[axis - 2, bottom - 4], [axis, bottom], [axis + 2, bottom - 4]]);
+      context.save();
+      context.translate(axis + 12, y);
+      context.rotate(-Math.PI / 2);
+      context.fillStyle = '#17614c';
+      context.font = '700 13px "Malgun Gothic", sans-serif';
+      context.textAlign = 'center';
+      context.fillText(upright, 0, 0);
+      context.restore();
     }
-    if (model.id === 'OD') label(spiralCatalog.stockLengthText(params.length), 98, 124);
-    else if (params.orientation) label(`${params.orientation}형`, 98, 124);
+
+    if (ovalElbows) {
+      const depth = params.depth1;
+      const width = ovalCatalog.widthFor(params.d1, depth);
+      for (const [index, orientation] of ['V', 'H'].entries()) {
+        const x = index * 200;
+        const vertical = orientation === 'V';
+        if (params.orientation === orientation) {
+          context.fillStyle = '#dcece399';
+          context.fillRect(x + 6, 6, 188, 140);
+        }
+        label(vertical ? 'V형 · 세움' : 'H형 · 눕힘', x + 100, 25);
+        label('측면', x + 54, 48);
+        label('접속 단면', x + 141, 48);
+        drawProfile(x + 54, 88, 81, 70, vertical ? 48 : 23);
+        drawSection(x + 137, 88, vertical ? 20 : 48, vertical ? 48 : 20,
+          vertical ? size('D ', depth) : size('W ', width),
+          vertical ? size('W ', width) : size('D ', depth));
+      }
+      outline([[200, 9], [200, 145]]);
+      label(`호칭 ${diameter('d1', 'Ø')}`, 200, 162);
+      return;
+    }
+
+    drawProfile(92, drawingHeight / 2 - 10, 146, 88);
+    if (model.id === 'OD') label(spiralCatalog.stockLengthText(params.length), 92, drawingHeight - 12);
+    else if (params.orientation) label(params.orientation === 'V' ? 'V형 · 세움' : 'H형 · 눕힘', 92, drawingHeight - 12);
+    for (const [index, field] of ovalEnds.entries()) {
+      const y = ovalEnds.length === 1 ? drawingHeight / 2 - 5 : 29 + index * 65;
+      const depth = params[`depth${field.ovalEnd}`];
+      const width = ovalCatalog.widthFor(params[field.key], depth);
+      const vertical = params.orientation === 'V';
+      if (field.ovalEnd) {
+        drawSection(218, y, vertical ? 15 : 48, vertical ? 34 : 17,
+          vertical ? size('D ', depth) : size('W ', width),
+          vertical ? size('W ', width) : size('D ', depth));
+      } else drawSection(218, y, 24, 24, diameter(field.key, 'Ø'));
+      label(`${field.label.split(' ')[0]} ${diameter(field.key)}`, 323, y + 4);
+    }
     return;
   }
 
