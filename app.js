@@ -19,7 +19,7 @@
     spiral: { button: byId('choose-spiral'), picker: byId('spiral-part-picker'), type: 'spiral' },
     outlet: { button: byId('choose-outlet'), picker: byId('outlet-part-picker'), type: 'grille' }
   };
-  const choiceDefaults = { material: 'galvanized', insulation: 'none', reinforcement: 'no' };
+  const choiceDefaults = { material: 'galvanized', insulation: 'none', reinforcement: 'no', level: 'center', side: 'center' };
   const supportsReinforcement = type => type === 'straight' || Boolean(elbowAngles[type]);
   const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format();
   const historyDate = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' });
@@ -360,7 +360,8 @@
         equalEndStraights: choice === 'yes' ? true : undefined };
     }
     if (type === 'reducer') return { type, length: Number(fields.reducerLength.value), outletWidth: Number(fields.outletWidth.value),
-      outletHeight: Number(fields.outletHeight.value), level: fields.level.value, side: fields.side.value };
+      outletHeight: Number(fields.outletHeight.value), level: fields.level.value || choiceDefaults.level,
+      side: fields.side.value || choiceDefaults.side };
     if (type === 'branch') return branchGeometry(size);
     if (isDamper(type)) return { type, length: damperLength };
     if (diffusers[type]) {
@@ -368,7 +369,7 @@
       return model ? { type, neck: model.neck, diffuserNominal: model.nominal, diffuserModel: model.code }
         : { type, neck: fields.diffuserNominal.value === 'legacy' ? Number(fields.neck.value) : null };
     }
-    if (isAirOutlet(type)) return { type };
+    if (isAirOutlet(type)) return { type, neckDimensions: true };
     return { type: 'straight', length: Number(fields.length.value),
       cutLength: fields.cutLength.value === '' ? undefined : Number(fields.cutLength.value) };
   }
@@ -404,6 +405,7 @@
     const damper = isDamper(type);
     const airOutlet = isAirOutlet(type);
     const diffuser = diffusers[type];
+    const outletNeck = airOutlet && !diffuser;
     const manualDiffuser = diffuser && fields.diffuserNominal.value === 'legacy';
     const showSection = !round && (!diffuser || manualDiffuser);
     const selectedGroup = round ? partGroups.spiral : airOutlet ? partGroups.outlet : partGroups.rect;
@@ -422,8 +424,10 @@
       fields[name].disabled = !visible;
       fields[name].required = visible && name !== 'cutLength';
     }
-    byId('width-label').textContent = diffuser?.roundFace ? '전면 지름 Ø' : diffuser ? '전면 가로' : '가로';
-    byId('height-label').textContent = diffuser ? '전면 세로' : '세로';
+    const widthLabel = diffuser?.roundFace ? '전면 지름 Ø' : diffuser ? '전면 가로' : outletNeck ? '목 가로' : '가로';
+    const heightLabel = diffuser ? '전면 세로' : outletNeck ? '목 세로' : '세로';
+    byId('width-label').textContent = widthLabel;
+    byId('height-label').textContent = heightLabel;
     const cTooLong = useInlet && geometry.length > 0 && geometry.inlet >= geometry.length / 2;
     fields.inlet.setCustomValidity(cTooLong ? '양쪽 C의 합은 총길이 L보다 작아야 합니다.' : '');
     fields.offsetLength.setCustomValidity(offset && geometry.length > offsetMaxLength
@@ -448,7 +452,7 @@
     byId('stock-label').hidden = !straight && !spiralStock;
     if (straight) byId('stock-label').textContent = geometry.cutLength === undefined
       ? `정척 ${format(stockLength)} mm` : positiveInteger(geometry.cutLength) ? `분할 기준 ${format(geometry.cutLength)} mm` : '분할 기준 확인';
-    if (spiralStock) byId('stock-label').textContent = `정척 ${format(geometry.params.length)} mm`;
+    if (spiralStock) byId('stock-label').textContent = `정척 ${spiralCatalog.stockLengthText(geometry.params.length)}`;
     byId('cut-title').textContent = straight || spiralStock ? '절단 미리보기' : '제작 규격 미리보기';
     const diagram = byId('fitting-diagram');
     if (round) {
@@ -458,9 +462,11 @@
         diagram.dataset.choice = diagramChoice;
         drawSpiralDiagram(diagram, model, geometry.params);
       }
-      const measurements = model.fields.map(field => [field.label, geometry.params[field.key]]);
+      const measurements = model.fields.filter(field => !spiralStock || field.diameter)
+        .map(field => [field.label, geometry.params[field.key]]);
       if (model.fixedLength) measurements.push(['L', model.fixedLength]);
-      const values = measurementDescription(measurements);
+      const values = [measurementDescription(measurements),
+        spiralStock ? `정척 ${spiralCatalog.stockLengthText(geometry.params.length)}` : ''].filter(Boolean).join(', ');
       diagram.setAttribute('aria-label', values ? `${model.name} 치수 안내 그림. ${values}` : `${model.name} 치수 안내 그림`);
       byId('fitting-caption').textContent = model.damper ? model.name : `${model.code} · ${model.name}`;
       return;
@@ -487,11 +493,11 @@
     };
     const [description, caption] = descriptions[type] ?? [`${ductNames[type]} 치수 그림`,
       damper ? `몸체 길이 L은 ${format(damperLength)} mm입니다.`
-        : diffuser ? '호칭 지름을 선택하면 Face(D)와 목 지름(A)이 표시됩니다.' : '가로와 세로를 입력하세요.'];
+        : diffuser ? '호칭 지름을 선택하면 Face(D)와 목 지름(A)이 표시됩니다.' : '목 안쪽의 가로·세로를 입력하세요.'];
     const outlet = branch ? '본관 접속' : '출구';
     const endMeasurements = twoEnds ? [[`${outlet} 가로`, geometry.outletWidth], [`${outlet} 세로`, geometry.outletHeight]] : [];
     const face = diffuser?.roundFace ? [['Face(D) 전면 지름', size.width]]
-      : diffuser ? [['Face(D) 가로', size.width], ['Face(D) 세로', size.height]] : [['가로', size.width], ['세로', size.height]];
+      : [[diffuser ? 'Face(D) 가로' : widthLabel, size.width], [diffuser ? 'Face(D) 세로' : heightLabel, size.height]];
     const values = measurementDescription([...face, ['실제 목 지름(A)', geometry.neck], ['R', geometry.radius],
       ['H', geometry.rise], ['L', geometry.length], ['C', useInlet ? geometry.inlet : null], ['분할 기준', geometry.cutLength], ...endMeasurements]);
     diagram.setAttribute('aria-label', values ? `${description}. ${values}` : description);
@@ -572,7 +578,7 @@
         : fields.diffuserModel.required ? 'Face(D) 또는 모델을 선택하세요.' : '호칭 지름을 선택하세요.';
       const hint = tooLong ? `고바이 총길이 L은 ${format(offsetMaxLength)} mm까지 입력할 수 있습니다.`
         : spiralStock ? '지름과 전체 길이를 입력하면 절단 치수와 발주 본수가 표시됩니다.'
-          : hints[type] ?? (diffusers[type] ? diffuserHint : '가로와 세로를 입력하세요.');
+          : hints[type] ?? (diffusers[type] ? diffuserHint : '목 안쪽의 가로·세로를 입력하세요.');
       container.replaceChildren(el('p', hint, 'cut-empty'));
       return;
     }
@@ -581,8 +587,10 @@
       const { length, runLength } = geometry.params;
       for (const cut of splitRun(runLength, run.repeat, length)) {
         const row = el('li');
-        row.append(el('span', cut.length === length ? '정척 사용' : '잔여 절단', 'piece-type'),
-          el('strong', `L ${format(cut.length)} mm`), el('span', `${format(cut.quantity)} EA`, 'piece-quantity'));
+        const stock = cut.length === length;
+        row.append(el('span', stock ? '정척 사용' : '잔여 절단', 'piece-type'),
+          el('strong', stock ? spiralCatalog.stockLengthText(length) : `${format(cut.length)} mm`),
+          el('span', `${format(cut.quantity)} EA`, 'piece-quantity'));
         list.append(row);
       }
       const [purchase] = pieces;
@@ -713,7 +721,9 @@
       const details = isAirOutlet(type) ? []
         : [materials[run.material].label, insulationText(run), run.reinforcementWidth ? `보강 ${format(run.reinforcementWidth)} mm` : '보강 미설치'];
       const quantity = run.repeat > 1 ? ` · ${format(run.repeat)}${type === 'straight' ? '구간' : ` ${itemUnit(run)}`}` : '';
-      text.append(el('strong', `${itemName(run)} · ${specText(run)}${quantity}`));
+      const spec = type === 'straight' ? crossSectionText(run) : specText(run);
+      const separator = diffusers[type] ? ' ' : ' · ';
+      text.append(el('strong', `${itemName(run)}${separator}${spec}${quantity}`));
       if (details.length) text.append(el('small', details.join(' · ')));
       const controls = el('div', undefined, 'run-actions');
       for (const [action, label] of [['edit', '수정'], ['delete', '삭제']]) {

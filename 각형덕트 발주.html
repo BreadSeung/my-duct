@@ -109,6 +109,10 @@
                   <div id="spiral-parts" class="choices part-choices"></div>
                 </fieldset>
                 <fieldset class="part-group">
+                  <legend>분기구 · 레듀서</legend>
+                  <div id="spiral-branches" class="choices part-choices"></div>
+                </fieldset>
+                <fieldset class="part-group">
                   <legend>원형댐퍼</legend>
                   <div id="spiral-dampers" class="choices part-choices damper-choices"></div>
                 </fieldset>
@@ -168,13 +172,13 @@
                   <div class="choices">
                     <label><input type="radio" name="level" value="top" required><span>상수평</span></label>
                     <label><input type="radio" name="level" value="bottom" required><span>하수평</span></label>
-                    <label><input type="radio" name="level" value="center" required><span>중심</span></label>
+                    <label><input type="radio" name="level" value="center" checked required><span>중심</span></label>
                   </div>
                 </fieldset>
                 <fieldset id="reducer-side-options" disabled>
                   <legend>폭 정렬</legend>
                   <div class="choices">
-                    <label><input type="radio" name="side" value="center" required><span>양고</span></label>
+                    <label><input type="radio" name="side" value="center" checked required><span>양고</span></label>
                     <label><input type="radio" name="side" value="left" required><span>좌편심</span></label>
                     <label><input type="radio" name="side" value="right" required><span>우편심</span></label>
                   </div>

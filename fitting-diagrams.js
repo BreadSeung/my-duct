@@ -78,20 +78,23 @@ function drawFittingDiagram(canvas, geometry, size, includeInlet) {
     context.translate(faceX, 16);
     drawOutletFace(context, type);
     context.restore();
-    const left = faceX + (diffuser?.roundFace ? 16 : 6);
-    const right = faceX + (diffuser?.roundFace ? 104 : 114);
-    line([[left, 114], [left, 138]]);
-    line([[right, 114], [right, 138]]);
+    const inside = !diffuser || diffuser.roundFace;
+    const left = faceX + (inside ? 16 : 6);
+    const right = faceX + (inside ? 104 : 114);
+    line([[left, diffuser ? 114 : 100], [left, 138]]);
+    line([[right, diffuser ? 114 : 100], [right, 138]]);
     dimension(left, 134, right, 134);
     const faceLabel = diffuser
       ? positiveInteger(size.width) ? `Face(D) ${orderCalculations.diffuserFaceText(type, size.width, size.height)}` : 'Face(D)'
-      : value('가로', size.width);
+      : value('목 가로', size.width);
     label(faceLabel, faceX + 60, 148);
     if (!diffuser?.roundFace) {
-      line([[faceX - 8, 22], [faceX + 4, 22]]);
-      line([[faceX - 8, 110], [faceX + 4, 110]]);
-      dimension(faceX - 9, 22, faceX - 9, 110);
-      label(value('세로', size.height), faceX - 16, 66, 'right');
+      const top = diffuser ? 22 : 32;
+      const bottom = diffuser ? 110 : 100;
+      line([[faceX - 8, top], [left, top]]);
+      line([[faceX - 8, bottom], [left, bottom]]);
+      dimension(faceX - 9, top, faceX - 9, bottom);
+      label(value(diffuser ? '세로' : '목 세로', size.height), faceX - 16, 66, 'right');
     }
     if (diffuser) {
       context.beginPath();
@@ -491,8 +494,16 @@ function drawDamperBody(ctx, type, round = false) {
   ctx.restore();
 
   if (motor) {
-    polygon([[144, 54], [171, 54], [171, 76], [144, 76]], '#5c7e70');
-    polygon([[171, 54], [178, 50], [178, 72], [171, 76]], '#8cad9a');
+    polygon([[143, 61], [151, 58], [151, 76], [143, 79]], '#e3eee9');
+    polygon([[150, 66], [167, 66], [167, 72], [150, 72]], '#607c71');
+    polygon([[163, 55], [169, 50], [194, 50], [189, 55]], '#d6e2de');
+    polygon([[189, 55], [194, 50], [194, 75], [189, 80]], '#5a7b70');
+    polygon([[163, 55], [189, 55], [189, 80], [163, 80]], '#8aa99e');
+    ctx.fillStyle = '#1a4336';
+    ctx.font = '700 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('M', 176, 68);
   } else if (!fire) {
     ctx.beginPath();
     ctx.moveTo(146, 69);

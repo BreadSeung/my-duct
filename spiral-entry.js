@@ -5,6 +5,7 @@ function mountSpiralEntry() {
   const section = document.getElementById('spiral-fields');
   const picker = document.getElementById('spiral-part-picker');
   const parts = document.getElementById('spiral-parts');
+  const branches = document.getElementById('spiral-branches');
   const dampers = document.getElementById('spiral-dampers');
   const box = document.getElementById('spiral-dimensions');
   const material = document.getElementById('spiral-material');
@@ -16,6 +17,7 @@ function mountSpiralEntry() {
   let controls = new Map();
   let legacyChoice;
   let legacyThickness;
+  let legacyDiameter;
   const choices = new Map();
   const labels = { SP: '직관', EB45: '45° 엘보', EB90: '90° 엘보', CPM: '커플링', TO: '테이크오프' };
 
@@ -51,13 +53,14 @@ function mountSpiralEntry() {
   }
 
   for (const model of spiralCatalog.orderModels) {
-    const group = model.damper ? dampers : parts;
-    group.append(makeChoice(model, model.damper ? model.code : labels[model.id]));
+    const group = model.damper ? dampers : model.branch ? branches : parts;
+    group.append(makeChoice(model, model.damper ? model.code : labels[model.id] ?? model.name));
   }
 
   picker.addEventListener('click', event => {
     const button = event.target.closest('button[data-model]');
     if (!button || button.dataset.model === activeModel.id) return;
+    legacyDiameter = undefined;
     if (legacyThickness) {
       const selected = Number(thickness.value);
       restoreThickness(thicknessChoices.includes(selected) ? selected : defaultThickness);
@@ -81,8 +84,8 @@ function mountSpiralEntry() {
     control.replaceChildren(new Option(options.length ? '선택' : '앞 지름 먼저 선택', ''));
     for (const value of options) {
       const label = field.key === 'flange' ? spiralCatalog.flangeOptions[value]
-        : field.key === 'length' ? `${format(value)} mm` : `Ø${format(value)}`;
-      control.append(new Option(label, value, value === field.defaultValue));
+        : field.key === 'length' ? spiralCatalog.stockLengthText(value) : `Ø${format(value)}`;
+      control.append(new Option(field.key === 'd1' && value === legacyDiameter ? `${label} (기존 발주)` : label, value, value === field.defaultValue));
     }
     control.value = Array.from(control.options).some(option => option.value === previous) && previous
       ? previous : String(field.defaultValue ?? '');
@@ -91,7 +94,10 @@ function mountSpiralEntry() {
   function updateOptions() {
     const params = readParams();
     for (const field of activeModel.fields) {
-      if (field.options) setOptions(field, controls.get(field.key), spiralCatalog.optionsFor(activeModel, field, params));
+      if (!field.options) continue;
+      const options = spiralCatalog.optionsFor(activeModel, field, params);
+      const sizes = field.key === 'd1' && legacyDiameter ? [...options, legacyDiameter] : options;
+      setOptions(field, controls.get(field.key), sizes);
     }
   }
 
@@ -162,6 +168,9 @@ function mountSpiralEntry() {
 
   function restore(values) {
     const model = spiralCatalog.get(values?.model) || spiralCatalog.get('SP');
+    const diameter = values?.params?.d1;
+    const inlet = model.fields.find(field => field.key === 'd1');
+    legacyDiameter = inlet?.options && !inlet.options.includes(diameter) && spiralCatalog.acceptsLegacyDiameter(model, diameter) ? diameter : undefined;
     material.value = values?.material || 'galvanized';
     restoreThickness(values?.spiralThickness);
     selectModel(model);
@@ -183,6 +192,20 @@ const spiralProfileFrames = {
   coupling: [72, 35, 96, 53],
   elbow90: [67, 8, 104, 105],
   elbow45: [67, 20, 74, 93],
+  conicalTee: [30, 35, 180, 75],
+  combinationTee: [30, 35, 180, 75],
+  reducingTee: [30, 35, 180, 75],
+  yBranch: [30, 35, 180, 84],
+  ytBranch: [30, 35, 180, 83],
+  roundReducer: [35, 30, 170, 64],
+};
+
+const spiralBranchProfiles = {
+  conicalTee: { outlet: [[94, 64], [145, 64], [133, 86], [133, 104], [106, 104], [106, 86]], collar: [[106, 97], [133, 97]] },
+  combinationTee: { outlet: [[90, 65], [145, 65], [142, 87], [142, 104], [114, 104], [114, 89]], collar: [[114, 97], [142, 97]] },
+  reducingTee: { outlet: [[94, 68], [133, 68], [133, 104], [94, 104]], collar: [[94, 97], [133, 97]] },
+  yBranch: { outlet: [[98, 70], [133, 65], [168, 99], [149, 115]], collar: [[144, 109], [162, 94]] },
+  ytBranch: { outlet: [[90, 69], [127, 66], [151, 87], [156, 102], [156, 114], [129, 114], [129, 103], [121, 94]], collar: [[129, 107], [156, 107]] },
 };
 
 function drawSpiralThumbnail(canvas, shape) {
@@ -226,6 +249,43 @@ function drawSpiralProfile(context, shape) {
     return fill;
   }
 
+  function polygon(points, fill) {
+    context.beginPath();
+    for (const [x, y] of points) context.lineTo(x, y);
+    context.closePath();
+    context.fillStyle = fill;
+    context.fill();
+    context.strokeStyle = edge;
+    context.lineWidth = 1.75;
+    context.stroke();
+  }
+
+  const branch = spiralBranchProfiles[shape];
+  if (branch) {
+    polygon(branch.outlet, cylinderFill(66, 115));
+    line(branch.collar);
+    if (shape === 'reducingTee') {
+      polygon([[33, 39], [145, 39], [169, 47], [207, 47], [207, 71], [169, 71], [145, 79], [33, 79]],
+        cylinderFill(39, 79));
+      line([[169, 47], [169, 71]]);
+      line([[198, 47], [198, 71]]);
+    } else {
+      box(33, 39, 174, 40, cylinderFill(39, 79));
+      line([[198, 39], [198, 79]]);
+    }
+    line([[42, 39], [42, 79]]);
+    return;
+  }
+
+  if (shape === 'roundReducer') {
+    polygon([[39, 35], [92, 35], [150, 47], [201, 47], [201, 74], [150, 74], [92, 86], [39, 86]], cylinderFill(35, 86));
+    line([[47, 35], [47, 86]]);
+    line([[92, 35], [92, 86]]);
+    line([[150, 47], [150, 74]]);
+    line([[193, 47], [193, 74]]);
+    return;
+  }
+
   if (shape === 'duct') {
     box(18, 41, 204, 41, cylinderFill(41, 82));
     context.save();
@@ -264,18 +324,7 @@ function drawSpiralProfile(context, shape) {
   fill.addColorStop(0.56, '#edf4ee');
   fill.addColorStop(1, '#b4c8bd');
 
-  function polygon(points) {
-    context.beginPath();
-    for (const [x, y] of points) context.lineTo(x, y);
-    context.closePath();
-    context.fillStyle = fill;
-    context.fill();
-    context.strokeStyle = edge;
-    context.lineWidth = 1.75;
-    context.stroke();
-  }
-
-  polygon([...angles.map(angle => point(outer, angle)), ...angles.slice().reverse().map(angle => point(inner, angle))]);
+  polygon([...angles.map(angle => point(outer, angle)), ...angles.slice().reverse().map(angle => point(inner, angle))], fill);
   for (const angle of angles.slice(1, -1)) {
     line([point(inner, angle), point(outer, angle)]);
     line([point(inner + 1, angle + 0.024), point(outer - 1, angle + 0.024)], '#f1f7f2');
@@ -285,7 +334,7 @@ function drawSpiralProfile(context, shape) {
       const [x, y] = point(radius, angle);
       return [x - direction * length * Math.sin(angle), y + direction * length * Math.cos(angle)];
     };
-    polygon([extension(outer, 0), extension(outer, 15), extension(inner, 15), extension(inner, 0)]);
+    polygon([extension(outer, 0), extension(outer, 15), extension(inner, 15), extension(inner, 0)], fill);
     line([extension(outer, 5), extension(inner, 5)]);
   }
 }
@@ -344,11 +393,16 @@ function drawSpiralDiagram(canvas, model, params) {
     if (shape === 'duct') {
       outline([[98, 91], [98, 111], [302, 111], [302, 91]]);
       outline([[310, 43], [320, 43], [320, 84], [310, 84]]);
-      label(size('L ', params.length), 200, 128);
+      label(spiralCatalog.stockLengthText(params.length), 200, 128);
       label(diameter('d1', 'Ø'), 351, 67);
     } else if (shape === 'coupling') {
       outline([[249, 45], [259, 45], [259, 82], [249, 82]]);
       label(diameter('d1', 'Ø'), 292, 67);
+    } else if (model.branch) {
+      const endY = shape === 'roundReducer' ? 66 : 64;
+      label(diameter('d1'), 75, endY);
+      label(diameter('d2'), 325, endY);
+      if (spiralBranchProfiles[shape]) label(diameter('d3'), shape === 'yBranch' ? 250 : shape === 'ytBranch' ? 225 : 203, 130);
     } else {
       const rightAngle = shape === 'elbow90';
       const angle = rightAngle ? 90 : 45;

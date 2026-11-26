@@ -10,6 +10,7 @@ const spiralCatalog = (() => {
     450, 475, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300,
     1350, 1400, 1450, 1500];
   const pressedElbows = [75, 80, 100, 125, 150, 160, 175, 180, 200, 250, 300];
+  const standardFittingDiameters = [75, 100, 125, 150, 200, 250, 300, 350, 400, 450, 500];
   const pressedCaps = [100, 125, 150, 200, 250, 300];
   const thicknessChoices = Object.freeze([0.5, 0.6, 0.8]);
   const defaultThickness = 0.6;
@@ -32,7 +33,7 @@ const spiralCatalog = (() => {
   const tee = [diam('d1', '본관 시작 Ød1'), diam('d2', '본관 끝 Ød2'), diam('d3', '분기 Ød3')];
   const cross = [...tee, diam('d4', '반대 분기 Ød4')];
   const twin = [diam('d1', '공통 지름 Ød1'), diam('d3', '분기 Ød3'), diam('d4', '분기 Ød4')];
-  const pressed = [diam('d1', '접속 지름 Ød1 = Ød2', pressedElbows)];
+  const pressed = [diam('d1', '접속 지름 Ød1 = Ød2', standardFittingDiameters)];
   const transition = [measure('l1', '사각 가로 l1'), measure('l2', '사각 세로 l2'), diam('d1', '원형 지름 Ød1')];
   const diameterPair = table => [diam('d1', '큰 쪽 지름 Ød1', keysAsNumbers(table)), diam('d2', '작은 쪽 지름 Ød2', [])];
   const model = (code, name, shape, fields = one, extra = {}) => ({ code, id: code, name, shape, fields, ...extra });
@@ -45,29 +46,29 @@ const spiralCatalog = (() => {
       { key: 'length', label: '정척 (한 본 길이)', options: [4000, 2000], defaultValue: 4000 },
       measure('runLength', '한 구간 전체 길이 L')])] },
     { name: '엘보', page: 5, models: [
-      ...pair('EB90', '90° 프레스 엘보', 'elbow90', pressed),
-      ...pair('EB45', '45° 프레스 엘보', 'elbow45', pressed),
+      ...pair('EB90', '90° 엘보', 'elbow90', pressed, { legacyDiameters: pressedElbows }),
+      ...pair('EB45', '45° 엘보', 'elbow45', pressed, { legacyDiameters: pressedElbows }),
       ...pair('EBS90', '90° 편 엘보', 'elbow90', [diam('d1', '기준 지름 Ød1', keysAsNumbers(elbow90)), ends[1]], { elbowLength: elbow90, checkCombination: true }),
       ...pair('EBS45', '45° 편 엘보', 'elbow45', [diam('d1', '기준 지름 Ød1', keysAsNumbers(elbow45)), ends[1]], { elbowLength: elbow45, checkCombination: true }),
       ...pair('TWEB90', '90° 트윈엘보', 'twin', twin, { checkCombination: true }),
     ] },
     { name: 'T 브랜치', page: 6, models: [
       ...pair('T', '정티', 'tee', tee, { checkCombination: true }),
-      ...pair('CNT', '원뿔 티', 'tee', tee, { checkCombination: true }),
-      ...pair('CMT', '편심 티', 'tee', tee, { checkCombination: true }),
+      ...pair('CNT', '원뿔 티', 'conicalTee', tee, { branch: true, checkCombination: true }),
+      ...pair('CMT', '편심 티', 'combinationTee', tee, { branch: true, checkCombination: true }),
       ...pair('CRT', '크로스 티', 'cross', cross, { checkCombination: true }),
-      ...pair('RT', '리듀싱 티', 'tee', tee, { checkCombination: true }),
+      ...pair('RT', '리듀싱 티', 'reducingTee', tee, { branch: true, checkCombination: true }),
       ...pair('RCNT', '리듀싱 원뿔 티', 'tee', tee, { checkCombination: true }),
       ...pair('RCMT', '리듀싱 편심 티', 'tee', tee, { checkCombination: true }),
       ...pair('RCRT', '리듀싱 크로스 티', 'cross', cross, { checkCombination: true }),
       ...pair('CAPT', '캡 티', 'tee', tee, { checkCombination: true }, 'CAPT'),
     ] },
     { name: 'Y · YT 브랜치 / 바지관 / 새들', page: 6, models: [
-      ...pair('YB', 'Y 브랜치', 'wye', tee, { checkCombination: true }),
+      ...pair('YB', 'Y 브랜치', 'yBranch', tee, { branch: true, checkCombination: true }),
       ...pair('RYB', '리듀싱 Y 브랜치', 'wye', tee, { checkCombination: true }),
       ...pair('CRYB', '크로스 Y 브랜치', 'crossY', cross, { checkCombination: true }),
       ...pair('RCRYB', '리듀싱 크로스 Y 브랜치', 'crossY', cross, { checkCombination: true }),
-      ...pair('YTB', 'YT 브랜치', 'wye', tee, { checkCombination: true }),
+      ...pair('YTB', 'YT 브랜치', 'ytBranch', tee, { branch: true, checkCombination: true }),
       ...pair('RYTB', '리듀싱 YT 브랜치', 'wye', tee, { checkCombination: true }),
       ...pair('CRYTB', '크로스 YT 브랜치', 'crossY', cross, { checkCombination: true }),
       ...pair('RCRYTB', '리듀싱 크로스 YT 브랜치', 'crossY', cross, { checkCombination: true }),
@@ -75,10 +76,11 @@ const spiralCatalog = (() => {
       ...pair('SD', '새들', 'saddle', [diam('d1', '본관 지름 Ød', keysAsNumbers(saddlePairs)), diam('d3', '분기 지름 Ød3', [])], { pairs: saddlePairs }),
     ] },
     { name: '커플링 · 리듀서', page: 7, models: [
-      model('CPM', '일반 커플링', 'coupling'), model('CPMF1', '한쪽 플랜지 커플링', 'coupling'),
+      model('CPM', '커플링', 'coupling', [diam('d1', '접속 지름 Ø', standardFittingDiameters)], { legacyDiameters: fittingDiameters }),
+      model('CPMF1', '한쪽 플랜지 커플링', 'coupling'),
       model('CPMF2', '양쪽 플랜지 커플링', 'coupling'), model('CPMG', '가스켓 커플링', 'coupling'),
       model('CPMSP', '스핀형 커플링', 'coupling'), model('CPF', '피팅용 커플링', 'coupling'),
-      ...pair('RD', '편 리듀서', 'reducer', reducedEnds, { reduction: true, checkCombination: true }),
+      ...pair('RD', '편 리듀서', 'roundReducer', reducedEnds, { branch: true, reduction: true, checkCombination: true }),
       ...pair('RDP', '프레스 리듀서', 'reducer', diameterPair(pressedReducerPairs), { pairs: pressedReducerPairs }),
     ] },
     { name: '캡 · 삿갓 · 플랫덕트', page: 7, models: [
@@ -110,10 +112,10 @@ const spiralCatalog = (() => {
     }
   }
   // Removed models still describe items that already exist in saved orders and drafts.
-  const orderModels = ['SP', 'EB45', 'EB90', 'CPM', 'TO'].map(id => models.get(id));
+  const orderModels = ['SP', 'EB45', 'EB90', 'CPM', 'TO', 'CNT', 'CMT', 'RT', 'YB', 'YTB', 'RD'].map(id => models.get(id));
   const { dampers, damperLength } = orderCalculations;
   for (const [damper, code] of Object.entries(dampers)) {
-    const item = model(code, `원형 ${code} 댐퍼`, 'damper', [{ key: 'd1', label: '접속 지름 Ø', diameter: true }],
+    const item = model(code, `원형 ${code} 댐퍼`, 'damper', [diam('d1', '접속 지름 Ø', standardFittingDiameters)],
       { id: `damper-${damper}`, damper, fixedLength: damperLength });
     models.set(item.id, item);
     orderModels.push(item);
@@ -126,6 +128,10 @@ const spiralCatalog = (() => {
     return field.options;
   }
 
+  function acceptsLegacyDiameter(model, diameter) {
+    return model.damper ? Number.isSafeInteger(diameter) && diameter > 0 : Boolean(model.legacyDiameters?.includes(diameter));
+  }
+
   function valid(item) {
     const model = models.get(item.model);
     if (!model || !item.params) return false;
@@ -135,9 +141,12 @@ const spiralCatalog = (() => {
     return model.fields.every(field => {
       const value = item.params[field.key];
       const options = optionsFor(model, field, item.params);
+      if (field.key === 'd1' && acceptsLegacyDiameter(model, value)) return true;
       return options ? options.includes(value) : Number.isSafeInteger(value) && value > 0;
     });
   }
+
+  const stockLengthText = length => `${length / 1000}M`;
 
   function spec(item, format) {
     const model = models.get(item.model);
@@ -145,12 +154,12 @@ const spiralCatalog = (() => {
     const parts = model.fields.filter(field => field.key !== 'flange' && field.key !== 'runLength').map(field => {
       const value = params[field.key];
       if (field.diameter) return `Ø${format(value)}`;
+      if (model.id === 'SP' && field.key === 'length') return stockLengthText(value);
       const symbol = { length: 'L', width: 'W', height: 'H', height2: 'H2=', l1: 'l1 ', l2: 'l2 ' }[field.key] || field.key;
       return `${symbol}${format(value)}`;
     });
     if (model.fixedLength) parts.push(`L${format(model.fixedLength)}`);
-    const specification = parts.join(' × ');
-    return params.runLength ? `${specification} / 전체 L${format(params.runLength)}` : specification;
+    return parts.join(' × ');
   }
 
   function details(item, format) {
@@ -165,5 +174,5 @@ const spiralCatalog = (() => {
   }
 
   return { orderModels, isOrderModel, get: id => models.get(id), optionsFor, valid, spec, details, flangeOptions,
-    thicknessChoices, defaultThickness };
+    acceptsLegacyDiameter, stockLengthText, thicknessChoices, defaultThickness };
 })();

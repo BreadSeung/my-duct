@@ -132,12 +132,11 @@ const orderCalculations = (() => {
     const section = crossSectionText(item);
     const type = ductType(item);
     if (diffusers[type]) {
-      const face = diffuserFaceText(type, item.width, item.height);
       return item.diffuserModel
-        ? `${item.diffuserModel} · 호칭 Ø${format(item.diffuserNominal)} / Face(D) ${face} / 목(A) Ø${format(item.neck)}`
-        : `전면 ${face} / 목 Ø${format(item.neck)}`;
+        ? item.diffuserModel.split(' ').at(-1)
+        : `전면 ${diffuserFaceText(type, item.width, item.height)} / 목 Ø${format(item.neck)}`;
     }
-    if (isAirOutlet(type)) return section;
+    if (isAirOutlet(type)) return item.neckDimensions ? `목 ${section}` : section;
     if (type === 'offset') return `${section} / ${offsetDetails(item)}`;
     if (hasTwoEnds(type)) return `${section} → ${outletSectionText(item)} / ${twoEndDetails(item)}`;
     if (elbowAngles[type]) return `${section} × R${format(radius)}`;
@@ -173,7 +172,7 @@ const orderCalculations = (() => {
         const productionLength = piece.length ?? run.length;
         const shape = type === 'spiral' ? [run.model, piece.params ?? run.params, run.spiralThickness]
           : [width, height, productionLength, run.radius, run.rise, run.inlet, run.equalEndStraights, run.outletWidth,
-            run.outletHeight, run.level, run.side, run.neck, run.diffuserModel];
+            run.outletHeight, run.level, run.side, run.neck, run.diffuserModel, run.neckDimensions];
         const key = JSON.stringify([type, ...shape, material, insulation, artilon, hb, reinforcementWidth, memo]);
         const item = items.get(key);
         if (item) item.quantity += piece.quantity;
