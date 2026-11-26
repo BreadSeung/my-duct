@@ -118,6 +118,8 @@ legend { padding: 0; margin: 0 0 7px; font-size: 13px; font-weight: 750; }
 #spiral-part-picker button { display: grid; place-items: center; gap: 2px; min-height: 56px; padding: 5px 3px; font-size: 12px; }
 .spiral-fields { margin-top: 12px; }
 .spiral-fields .dimension-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.spiral-run-length { grid-column: 1 / -1; }
+.cut-stock-total { margin-top: 9px; font-size: 12px; font-weight: 650; }
 .spiral-fields > label { display: grid; gap: 5px; color: #344a40; font-size: 12px; font-weight: 700; }
 .spiral-fields .field-hint { margin-top: 7px; }
 .spiral-fields a { display: inline-block; margin-top: 4px; color: #17614c; font-size: 11px; }

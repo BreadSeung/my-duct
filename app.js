@@ -3,7 +3,7 @@
 (() => {
   const { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels, format, positiveInteger,
     hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, hbKey, insulationText, specText,
-    crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, orderPieces, orderQuantity, quantityText, orderItems, missingDetails } = orderCalculations;
+    crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, splitRun, orderPieces, orderQuantity, quantityText, orderItems, missingDetails } = orderCalculations;
   const storageKey = 'hanguk-duct-order-v1';
   const byId = id => document.getElementById(id);
   const form = byId('entry-form');
@@ -117,7 +117,7 @@
   function hasWork({ meta, runs, draft }) {
     const round = draft.spiral;
     const spiralWork = round && (round.model !== 'SP' || round.material !== 'galvanized' || round.spiralThickness
-      || round.params.d1 || round.params.length !== 4000);
+      || round.params.d1 || round.params.runLength || round.params.length !== 4000);
     return runs.length || Object.keys(infoLabels).some(name => name !== 'orderDate' && meta[name])
       || (meta.orderDate || '') !== today()
       || spiralWork || draft.repeat !== '1' || draftFields.some(name => !['type', 'repeat'].includes(name) && draft[name] && draft[name] !== choiceDefaults[name]);
@@ -130,7 +130,13 @@
     const draft = Object.fromEntries(draftFields.map(name => [name, values[name] || choiceDefaults[name] || '']));
     if (wasManualDiffuser(values)) draft.diffuserNominal = 'legacy';
     draft.editingId = values.editingId ?? null;
-    if (values.spiral) draft.spiral = values.spiral;
+    if (values.spiral) {
+      draft.spiral = values.spiral;
+      const { model, params } = values.spiral;
+      if (model === 'SP' && params.runLength === undefined) {
+        draft.spiral = { ...values.spiral, params: { ...params, runLength: params.d1 ? params.length : null } };
+      }
+    }
     return JSON.stringify(order) !== JSON.stringify({ ...saved.order, draft });
   }
 
@@ -389,6 +395,7 @@
     const { type } = geometry;
     const straight = type === 'straight';
     const round = type === 'spiral';
+    const spiralStock = round && geometry.model === 'SP';
     const offset = type === 'offset';
     const reducer = type === 'reducer';
     const branch = type === 'branch';
@@ -434,12 +441,13 @@
     byId('rect-material-options').disabled = round || airOutlet;
     byId('insulation-section').hidden = airOutlet;
     byId('insulation-options').disabled = airOutlet;
-    byId('quantity-label').textContent = straight ? '같은 구간 수' : `수량 (${itemUnit(geometry)})`;
+    byId('quantity-label').textContent = straight || spiralStock ? '같은 구간 수' : `수량 (${itemUnit(geometry)})`;
     byId('fitting-guide').hidden = false;
-    byId('stock-label').hidden = !straight;
+    byId('stock-label').hidden = !straight && !spiralStock;
     if (straight) byId('stock-label').textContent = geometry.cutLength === undefined
       ? `정척 ${format(stockLength)} mm` : positiveInteger(geometry.cutLength) ? `분할 기준 ${format(geometry.cutLength)} mm` : '분할 기준 확인';
-    byId('cut-title').textContent = straight ? '절단 미리보기' : '제작 규격 미리보기';
+    if (spiralStock) byId('stock-label').textContent = `정척 ${format(geometry.params.length)} mm`;
+    byId('cut-title').textContent = straight || spiralStock ? '절단 미리보기' : '제작 규격 미리보기';
     const diagram = byId('fitting-diagram');
     if (round) {
       const model = spiralCatalog.get(geometry.model);
@@ -543,6 +551,7 @@
   function renderPreview(size, geometry) {
     const container = byId('cut-preview');
     const type = geometry.type;
+    const spiralStock = type === 'spiral' && geometry.model === 'SP';
     const run = { ...size, ...geometry, repeat: Number(fields.repeat.value) };
     const pieces = validGeometry(run) ? orderPieces(run) : [];
     if ((!size && type !== 'spiral') || !pieces.length) {
@@ -560,11 +569,25 @@
       const diffuserHint = fields.diffuserNominal.value === 'legacy' ? '전면 치수와 목 지름을 입력하세요.'
         : fields.diffuserModel.required ? 'Face(D) 또는 모델을 선택하세요.' : '호칭 지름을 선택하세요.';
       const hint = tooLong ? `고바이 총길이 L은 ${format(offsetMaxLength)} mm까지 입력할 수 있습니다.`
-        : hints[type] ?? (diffusers[type] ? diffuserHint : '가로와 세로를 입력하세요.');
+        : spiralStock ? '지름과 전체 길이를 입력하면 절단 치수와 발주 본수가 표시됩니다.'
+          : hints[type] ?? (diffusers[type] ? diffuserHint : '가로와 세로를 입력하세요.');
       container.replaceChildren(el('p', hint, 'cut-empty'));
       return;
     }
     const list = el('ul', undefined, 'cut-list');
+    if (spiralStock) {
+      const { length, runLength } = geometry.params;
+      for (const cut of splitRun(runLength, run.repeat, length)) {
+        const row = el('li');
+        row.append(el('span', cut.length === length ? '정척 사용' : '잔여 절단', 'piece-type'),
+          el('strong', `L ${format(cut.length)} mm`), el('span', `${format(cut.quantity)} EA`, 'piece-quantity'));
+        list.append(row);
+      }
+      const [purchase] = pieces;
+      container.replaceChildren(list, el('p',
+        `발주 ${specText({ ...geometry, ...purchase })} · ${format(purchase.quantity)} EA`, 'cut-stock-total'));
+      return;
+    }
     for (const piece of pieces) {
       const row = el('li');
       const splitLength = geometry.cutLength ?? stockLength;
@@ -840,7 +863,9 @@
     const wasEditing = Boolean(editingId);
     if (wasEditing) state.runs = state.runs.map(previous => previous.id === editingId ? run : previous);
     else state.runs.push(run);
-    fillForm({ type: run.type, spiral: round && spiralCatalog.isOrderModel(run.model) ? { model: run.model } : undefined });
+    const spiralDefaults = round && spiralCatalog.isOrderModel(run.model)
+      ? { model: run.model, params: run.model === 'SP' ? { length: run.params.length } : undefined } : undefined;
+    fillForm({ type: run.type, spiral: spiralDefaults });
     saveState();
     refreshOrder();
     setMessage(wasEditing ? '품목을 수정했습니다.' : `${itemName(run)} 품목을 추가했습니다.`);

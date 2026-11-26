@@ -146,6 +146,11 @@ const orderCalculations = (() => {
 
   function orderPieces(item) {
     if (ductType(item) === 'straight') return splitRun(item.length, item.repeat, item.cutLength);
+    if (item.type === 'spiral' && item.model === 'SP' && item.params.runLength !== undefined) {
+      const { d1, length, runLength } = item.params;
+      const quantity = splitRun(runLength, item.repeat, length).reduce((total, piece) => total + piece.quantity, 0);
+      return quantity ? [{ params: { d1, length }, quantity }] : [];
+    }
     return positiveInteger(item.repeat) ? [{ quantity: item.repeat }] : [];
   }
 
@@ -166,7 +171,7 @@ const orderCalculations = (() => {
       const type = ductType(run);
       for (const piece of orderPieces(run)) {
         const productionLength = piece.length ?? run.length;
-        const shape = type === 'spiral' ? [run.model, run.params, run.spiralThickness]
+        const shape = type === 'spiral' ? [run.model, piece.params ?? run.params, run.spiralThickness]
           : [width, height, productionLength, run.radius, run.rise, run.inlet, run.equalEndStraights, run.outletWidth,
             run.outletHeight, run.level, run.side, run.neck, run.diffuserModel];
         const key = JSON.stringify([type, ...shape, material, insulation, artilon, hb, reinforcementWidth, memo]);

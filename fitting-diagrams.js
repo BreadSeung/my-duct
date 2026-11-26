@@ -412,7 +412,6 @@ function drawPartThumbnail(canvas, type, round = false) {
       reducer: [[24, 3], [34, 9], [34, 19], [24, 25]],
       branch: [[7, 5], [53, 5], [53, 16], [38, 16], [36, 23], [24, 23], [22, 16], [7, 16]],
       spiral: [[7, 8], [53, 8], [53, 21], [7, 21]],
-      spiralCoupling: [[15, 6], [45, 6], [45, 22], [15, 22]],
       spiralTakeoff: [[9, 23], [17, 18], [17, 5], [43, 5], [43, 18], [51, 23]],
     };
     for (const [x, y] of outlines[type]) context.lineTo(x, y);

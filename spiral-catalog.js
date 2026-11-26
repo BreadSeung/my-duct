@@ -46,7 +46,8 @@ const spiralCatalog = (() => {
   ];
   const groups = [
     { name: '스파이럴 직관', page: 1, models: [model('SP', '스파이럴 직관', 'duct', [diam('d1', '직관 지름 Ø', ductDiameters),
-      { key: 'length', label: '한 본 길이 L', options: [4000, 2000], defaultValue: 4000 }])] },
+      { key: 'length', label: '정척 (한 본 길이)', options: [4000, 2000], defaultValue: 4000 },
+      measure('runLength', '한 구간 전체 길이 L')])] },
     { name: '엘보', page: 5, models: [
       ...pair('EB90', '90° 프레스 엘보', 'elbow90', pressed),
       ...pair('EB45', '45° 프레스 엘보', 'elbow45', pressed),
@@ -156,14 +157,15 @@ const spiralCatalog = (() => {
   function spec(item, format) {
     const model = models.get(item.model);
     const params = item.params;
-    const parts = model.fields.filter(field => field.key !== 'flange').map(field => {
+    const parts = model.fields.filter(field => field.key !== 'flange' && field.key !== 'runLength').map(field => {
       const value = params[field.key];
       if (field.diameter) return `Ø${format(value)}`;
       const symbol = { length: 'L', width: 'W', height: 'H', height2: 'H2=', l1: 'l1 ', l2: 'l2 ' }[field.key] || field.key;
       return `${symbol}${format(value)}`;
     });
     if (model.fixedLength) parts.push(`L${format(model.fixedLength)}`);
-    return parts.join(' × ');
+    const specification = parts.join(' × ');
+    return params.runLength ? `${specification} / 전체 L${format(params.runLength)}` : specification;
   }
 
   function details(item, format) {
