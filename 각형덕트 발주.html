@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>발주서 | 한국닥트</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="calculations.js"></script>
+  <script defer src="spiral-catalog.js"></script>
+  <script defer src="fitting-diagrams.js"></script>
+  <script defer src="spiral-entry.js"></script>
+  <script defer src="order-pdf.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="page-width topbar-inner">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span>한국닥트</div>
+        <span id="save-status" role="status"></span>
+      </div>
+    </header>
+
+    <main class="page-width">
+      <div class="page-heading">
+        <div>
+          <h1>발주서</h1>
+          <p>직관과 부속의 치수, 제작 조건을 입력해 발주서를 작성하세요.</p>
+        </div>
+        <div class="actions">
+          <button id="new-order" type="button" class="button secondary">새 발주</button>
+          <button id="close-order" type="button" class="button secondary">작업 닫기</button>
+          <button id="csv" type="button" class="button secondary" disabled>CSV 저장</button>
+          <button id="print" type="button" class="button primary" disabled>발주서 인쇄 · PDF</button>
+        </div>
+        <p id="pdf-status" class="pdf-status" role="status"></p>
+      </div>
+
+      <section class="card order-info" aria-labelledby="info-title">
+        <h2 id="info-title">발주 정보</h2>
+        <div id="order-info" class="info-fields">
+          <label>현장명<input name="site" maxlength="80" placeholder="현장명 입력"></label>
+          <label>수신처<input name="supplier" maxlength="80" placeholder="제작 업체명"></label>
+          <label>발주일<input name="orderDate" type="date"></label>
+          <label>납품일<input name="deliveryDate" type="date"></label>
+          <label>담당 / 연락처<input name="contact" maxlength="80" placeholder="담당자 및 전화번호"></label>
+          <label>납품 장소<input name="address" maxlength="140" placeholder="주소 또는 인수 장소"></label>
+        </div>
+      </section>
+
+      <div class="workspace-grid">
+        <section class="card entry" aria-labelledby="entry-title">
+          <div class="section-heading">
+            <h2 id="entry-title">덕트 품목 입력</h2>
+            <span class="unit-note">치수 단위 mm</span>
+          </div>
+          <form id="entry-form" autocomplete="off">
+            <div class="form-section">
+              <div class="choices duct-families" role="group" aria-label="품목 분류">
+                <button id="choose-rect" class="button secondary" type="button" aria-pressed="true" aria-controls="rect-part-picker">각형덕트</button>
+                <button id="choose-spiral" class="button secondary" type="button" aria-pressed="false" aria-controls="spiral-part-picker">스파이럴덕트</button>
+                <button id="choose-outlet" class="button secondary" type="button" aria-pressed="false" aria-controls="outlet-part-picker" aria-label="그릴·레지스터·루버·디퓨저">그릴·디퓨저</button>
+              </div>
+              <input type="radio" name="type" value="spiral" hidden aria-hidden="true">
+              <div id="rect-part-picker">
+                <fieldset>
+                  <legend>품목 선택</legend>
+                  <div class="choices part-choices">
+                    <label><input type="radio" name="type" value="straight" checked><span><canvas data-part="straight" width="120" height="56" aria-hidden="true"></canvas>직관</span></label>
+                    <label><input type="radio" name="type" value="elbow"><span><canvas data-part="elbow" width="120" height="56" aria-hidden="true"></canvas>90° 엘보</span></label>
+                    <label><input type="radio" name="type" value="elbow45"><span><canvas data-part="elbow45" width="120" height="56" aria-hidden="true"></canvas>45° 엘보</span></label>
+                    <label><input type="radio" name="type" value="offset"><span><canvas data-part="offset" width="120" height="56" aria-hidden="true"></canvas>고바이</span></label>
+                    <label><input type="radio" name="type" value="reducer"><span><canvas data-part="reducer" width="120" height="56" aria-hidden="true"></canvas>레두샤</span></label>
+                    <label><input type="radio" name="type" value="branch"><span><canvas data-part="branch" width="120" height="56" aria-hidden="true"></canvas>분기구</span></label>
+                  </div>
+                </fieldset>
+                <fieldset class="part-group">
+                  <legend>각형덕트 댐퍼</legend>
+                  <div class="choices part-choices damper-choices">
+                    <label><input type="radio" name="type" value="vd"><span><canvas data-part="vd" width="120" height="56" aria-hidden="true"></canvas>V.D</span></label>
+                    <label><input type="radio" name="type" value="mvd"><span><canvas data-part="mvd" width="120" height="56" aria-hidden="true"></canvas>M.V.D</span></label>
+                    <label><input type="radio" name="type" value="fd"><span><canvas data-part="fd" width="120" height="56" aria-hidden="true"></canvas>F.D</span></label>
+                    <label><input type="radio" name="type" value="mfd"><span><canvas data-part="mfd" width="120" height="56" aria-hidden="true"></canvas>M.F.D</span></label>
+                  </div>
+                </fieldset>
+              </div>
+              <div id="outlet-part-picker" hidden>
+                <fieldset>
+                  <legend>그릴 · 레지스터 · 루버</legend>
+                  <div class="choices part-choices">
+                    <label><input type="radio" name="type" value="grille"><span><canvas data-part="grille" width="120" height="56" aria-hidden="true"></canvas>그릴</span></label>
+                    <label><input type="radio" name="type" value="register"><span><canvas data-part="register" width="120" height="56" aria-hidden="true"></canvas>레지스터</span></label>
+                    <label><input type="radio" name="type" value="louver"><span><canvas data-part="louver" width="120" height="56" aria-hidden="true"></canvas>루버</span></label>
+                  </div>
+                </fieldset>
+                <fieldset class="part-group">
+                  <legend>디퓨저</legend>
+                  <div class="choices part-choices diffuser-choices">
+                    <label><input type="radio" name="type" value="roundDiffuser"><span><canvas data-part="roundDiffuser" width="120" height="56" aria-hidden="true"></canvas>원형팬</span></label>
+                    <label><input type="radio" name="type" value="squareDiffuser"><span><canvas data-part="squareDiffuser" width="120" height="56" aria-hidden="true"></canvas>사각팬</span></label>
+                    <label><input type="radio" name="type" value="nozzleDiffuser"><span><canvas data-part="nozzleDiffuser" width="120" height="56" aria-hidden="true"></canvas>노즐디퓨저</span></label>
+                    <label><input type="radio" name="type" value="squareRoundDiffuser"><span><canvas data-part="squareRoundDiffuser" width="120" height="56" aria-hidden="true"></canvas>각원팬</span></label>
+                  </div>
+                </fieldset>
+              </div>
+              <div id="spiral-part-picker" hidden>
+                <fieldset>
+                  <legend>스파이럴 품목 선택</legend>
+                  <div id="spiral-parts" class="choices part-choices"></div>
+                </fieldset>
+                <fieldset class="part-group">
+                  <legend>원형댐퍼</legend>
+                  <div id="spiral-dampers" class="choices part-choices damper-choices"></div>
+                </fieldset>
+              </div>
+              <figure id="fitting-guide" class="fitting-guide" hidden>
+                <canvas id="fitting-diagram" width="800" height="320" role="img"></canvas>
+                <figcaption id="fitting-caption"></figcaption>
+              </figure>
+              <fieldset id="spiral-fields" class="spiral-fields" hidden disabled>
+                <legend>스파이럴 규격</legend>
+                <div id="spiral-dimensions" class="dimension-fields"></div>
+                <div class="dimension-fields spiral-finish">
+                  <label>재질<select id="spiral-material" name="spiralMaterial">
+                    <option value="galvanized">아연도금강판</option>
+                    <option value="galvalume">갈바륨</option>
+                    <option value="sts304">STS 304</option>
+                  </select></label>
+                  <label>판두께 (T)<input id="spiral-thickness" name="spiralThickness" type="number" min="0.01" step="any" inputmode="decimal" placeholder="제품 표준"></label>
+                </div>
+                <p id="spiral-note" class="field-hint" aria-live="polite"></p>
+                <a id="spiral-reference" target="_blank" rel="noopener noreferrer">제조사 규격표</a>
+              </fieldset>
+              <fieldset id="diffuser-fields" class="spiral-fields" hidden disabled>
+                <legend>디퓨저 규격</legend>
+                <div class="dimension-fields">
+                  <label>호칭 지름<select name="diffuserNominal" required></select></label>
+                  <label hidden>Face(D) / 모델<select name="diffuserModel" disabled></select></label>
+                </div>
+                <dl id="diffuser-spec" class="diffuser-spec" aria-live="polite" hidden>
+                  <div><dt>Face(D)</dt><dd id="diffuser-face"></dd></div>
+                  <div><dt>실제 목 지름(A)</dt><dd id="diffuser-neck"></dd></div>
+                  <div><dt>모델</dt><dd id="diffuser-code"></dd></div>
+                </dl>
+              </fieldset>
+              <div id="two-end-inlet-label" class="section-label" hidden>입구 (A × B)</div>
+              <div class="dimension-fields">
+                <label><span id="width-label">가로</span><input name="width" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 500" required></label>
+                <label><span id="height-label">세로</span><input name="height" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 300" required></label>
+                <label hidden>목 지름 Ø<input name="neck" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 150" disabled></label>
+                <label id="straight-length">전체 길이<input name="length" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 5000" required></label>
+                <label id="straight-cut-length"><span class="measurement-label">분할 기준 길이 <small>선택</small></span><input name="cutLength" type="number" min="1" step="1" inputmode="numeric" placeholder="비우면 1,430 mm"></label>
+                <label id="elbow-radius" hidden>안쪽 반경 R<input name="radius" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 200" disabled></label>
+                <label id="offset-rise" hidden>밑면 높이 차 H<input name="rise" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 200" disabled></label>
+                <label id="offset-length" hidden><span class="measurement-label">총길이 L <small>최대 1,430 mm</small></span><input name="offsetLength" type="number" min="1" max="1430" step="1" inputmode="numeric" placeholder="예: 600" disabled></label>
+              </div>
+              <div id="reducer-fields" class="reducer-fields" hidden>
+                <fieldset>
+                  <legend>출구 (C × D)</legend>
+                  <div class="dimension-fields">
+                    <label>출구 가로<input name="outletWidth" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 400" disabled></label>
+                    <label>출구 세로<input name="outletHeight" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 250" disabled></label>
+                  </div>
+                </fieldset>
+                <label>제작 길이 L<input name="reducerLength" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 450" disabled></label>
+                <fieldset id="reducer-level-options" disabled>
+                  <legend>높이 정렬</legend>
+                  <div class="choices">
+                    <label><input type="radio" name="level" value="top" required><span>상수평</span></label>
+                    <label><input type="radio" name="level" value="bottom" required><span>하수평</span></label>
+                    <label><input type="radio" name="level" value="center" required><span>중심</span></label>
+                  </div>
+                </fieldset>
+                <fieldset id="reducer-side-options" disabled>
+                  <legend>폭 정렬</legend>
+                  <div class="choices">
+                    <label><input type="radio" name="side" value="center" required><span>양고</span></label>
+                    <label><input type="radio" name="side" value="left" required><span>좌편심</span></label>
+                    <label><input type="radio" name="side" value="right" required><span>우편심</span></label>
+                  </div>
+                </fieldset>
+              </div>
+              <div id="branch-fields" class="branch-fields" hidden>
+                <div><span>반대쪽 가로 × 세로</span><output id="branch-outlet" aria-live="polite">—</output></div>
+                <div><span>제작 길이 L</span><strong>200 mm</strong></div>
+              </div>
+              <div id="damper-length" class="branch-fields" hidden>
+                <div><span>제작 길이 L (고정)</span><strong id="damper-length-value"></strong></div>
+              </div>
+              <fieldset id="offset-options" class="offset-options" hidden disabled>
+                <legend>양쪽 직선부 C를 넣을까요?</legend>
+                <div class="choices">
+                  <label><input type="radio" name="includeInlet" value="no" required><span>C 미적용</span></label>
+                  <label><input type="radio" name="includeInlet" value="yes" required><span>C 입력</span></label>
+                </div>
+              </fieldset>
+              <label id="offset-inlet" class="offset-inlet" hidden>양쪽에 적용할 C 치수<input name="inlet" type="number" min="1" step="1" inputmode="numeric" placeholder="예: 100" disabled></label>
+              <label class="repeat-field"><span id="quantity-label">같은 구간 수</span><input name="repeat" type="number" min="1" step="1" inputmode="numeric" value="1" required></label>
+            </div>
+
+            <div id="rect-material-section" class="form-section">
+              <fieldset id="rect-material-options">
+                <legend>강판 재질</legend>
+                <div class="choices">
+                  <label><input type="radio" name="material" value="galvanized" required><span>아연도강판</span></label>
+                  <label><input type="radio" name="material" value="sts201" required><span>STS 201</span></label>
+                  <label><input type="radio" name="material" value="sts304" required><span>STS 304</span></label>
+                </div>
+              </fieldset>
+              <div class="plate-preview">
+                <span id="long-side">장변 —</span>
+                <output id="plate" aria-live="polite">판두께 —</output>
+              </div>
+              <details class="plate-guide">
+                <summary>판두께 적용 기준</summary>
+                <table>
+                  <thead><tr><th scope="col">판두께</th><th scope="col">아연도강판 장변</th><th scope="col">STS 201·304 장변</th></tr></thead>
+                  <tbody>
+                    <tr><th scope="row">0.5T</th><td>450 이하</td><td>750 이하</td></tr>
+                    <tr><th scope="row">0.6T</th><td>451–750</td><td>—</td></tr>
+                    <tr><th scope="row">0.8T</th><td>750 초과</td><td>750 초과</td></tr>
+                  </tbody>
+                </table>
+              </details>
+            </div>
+
+            <div id="insulation-section" class="form-section">
+              <fieldset id="insulation-options">
+                <legend>보온재를 사용하나요?</legend>
+                <div class="choices">
+                  <label><input type="radio" name="insulation" value="none" checked><span>미사용</span></label>
+                  <label><input type="radio" name="insulation" value="rubber"><span>고무발포 13T</span></label>
+                  <label><input type="radio" name="insulation" value="artilon"><span>아티론</span></label>
+                </div>
+              </fieldset>
+              <div id="insulation-fields" class="conditional" hidden>
+                <label id="artilon-field" hidden>아티론 두께 (T)<input name="artilon" type="number" min="0" step="any" inputmode="decimal" placeholder="두께 직접 입력"></label>
+                <label>HB값<input name="hb" maxlength="48" placeholder="현장 HB값 입력" aria-describedby="hb-hint"></label>
+                <p class="field-hint" id="hb-hint" aria-live="polite"></p>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <fieldset id="reinforcement-choice">
+                <legend>갈바 보강을 설치하나요?</legend>
+                <div class="choices">
+                  <label><input type="radio" name="reinforcement" value="no" checked><span>미설치</span></label>
+                  <label><input type="radio" name="reinforcement" value="yes"><span>설치</span></label>
+                </div>
+              </fieldset>
+              <div id="reinforcement-fields" class="conditional" hidden>
+                <label>보강 폭 (mm)
+                  <select name="reinforcementSize">
+                    <option value="">보강 폭 선택</option>
+                    <option value="100">100 mm</option>
+                    <option value="150">150 mm</option>
+                    <option value="200">200 mm</option>
+                    <option value="custom">직접 입력</option>
+                  </select>
+                </label>
+                <label id="custom-field" hidden>직접 입력 (mm)<input name="customReinforcement" type="number" min="1" step="1" inputmode="numeric"></label>
+              </div>
+              <label class="memo-field">비고<input name="memo" maxlength="120" placeholder="예: 보강 위치, 설치 지시사항"></label>
+            </div>
+            <div class="entry-actions">
+              <button id="add-entry" class="button primary" type="submit">발주에 추가</button>
+              <button id="cancel-edit" class="button secondary" type="button" hidden>수정 취소</button>
+            </div>
+            <p id="form-message" class="form-message" role="status" hidden></p>
+          </form>
+        </section>
+
+        <div class="results">
+          <section class="cut-preview" aria-labelledby="cut-title">
+            <div class="section-heading"><h2 id="cut-title">절단 미리보기</h2><span id="stock-label" class="stock-label">정척 1,430 mm</span></div>
+            <div id="cut-preview" aria-live="polite"></div>
+          </section>
+
+          <section class="card order-items" aria-labelledby="items-title">
+            <div class="section-heading"><h2 id="items-title">발주 품목</h2><span id="order-size" class="unit-note">0개 품목 · 총 0 EA</span></div>
+            <p id="order-warning" class="notice" role="status" hidden></p>
+            <div id="empty-order" class="empty-order">
+              <p>등록된 발주 품목이 없습니다.</p>
+              <span>품목을 추가하면 제작 규격과 수량이 표시됩니다.</span>
+            </div>
+            <div id="order-table" class="table-scroll" role="region" aria-label="발주 품목 표" tabindex="0" hidden></div>
+          </section>
+
+          <section class="card runs" aria-labelledby="runs-title">
+            <div class="section-heading"><h2 id="runs-title">입력한 품목</h2><span id="run-size" class="unit-note">0건</span></div>
+            <p id="empty-runs" class="subtle-empty">추가한 품목은 여기서 수정하거나 삭제할 수 있습니다.</p>
+            <ul id="run-list"></ul>
+          </section>
+        </div>
+        <aside id="order-history" class="card order-history" aria-labelledby="history-title">
+          <div class="section-heading">
+            <h2 id="history-title" tabindex="-1">발주 기록</h2>
+            <span id="history-count" class="unit-note">0건</span>
+          </div>
+          <button id="save-order" class="button secondary" type="button" disabled>현재 발주 저장</button>
+          <div class="history-group" aria-labelledby="draft-history-title">
+            <h3 id="draft-history-title">작성 중인 발주</h3>
+            <p id="draft-history-empty" class="subtle-empty">이어서 작성할 발주가 없습니다.</p>
+            <ul id="draft-history-list" class="history-list"></ul>
+          </div>
+          <div class="history-group" aria-labelledby="saved-history-title">
+            <h3 id="saved-history-title">저장한 발주서</h3>
+            <p id="history-empty" class="subtle-empty">저장한 발주서가 없습니다.</p>
+            <ul id="history-list" class="history-list"></ul>
+          </div>
+          <button id="export-history" class="button secondary compact" type="button" disabled>발주 기록 내보내기</button>
+          <p id="history-status" class="history-status" role="status"></p>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="save-dialog" class="order-dialog" aria-labelledby="save-dialog-title">
+    <form method="dialog">
+      <h2 id="save-dialog-title">현재 발주를 저장할까요?</h2>
+      <p>저장한 발주와 임시저장한 발주는 발주 기록에서 다시 열 수 있습니다.</p>
+      <div class="actions">
+        <button class="button secondary" value="cancel">취소</button>
+        <button id="discard-action" class="button secondary" value="skip">저장 안 함</button>
+        <button class="button primary" value="save" autofocus>기록에 저장</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="delete-history-dialog" class="order-dialog" aria-labelledby="delete-history-title" aria-describedby="delete-history-description">
+    <form method="dialog">
+      <h2 id="delete-history-title">발주 기록을 삭제할까요?</h2>
+      <p id="delete-history-description"></p>
+      <div class="actions">
+        <button class="button secondary" value="cancel" autofocus>취소</button>
+        <button class="button danger" value="delete">삭제</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="pdf-dialog" class="order-dialog" aria-labelledby="pdf-dialog-title">
+    <form method="dialog">
+      <h2 id="pdf-dialog-title">발주서 PDF</h2>
+      <p id="pdf-dialog-message" role="status"></p>
+      <div class="actions">
+        <button class="button secondary" value="close">닫기</button>
+        <a id="open-pdf" class="button secondary" target="_blank" rel="noopener">PDF 열기</a>
+        <button id="share-pdf" class="button secondary" type="button" hidden>공유</button>
+        <a id="download-pdf" class="button primary" autofocus download>파일 저장</a>
+      </div>
+    </form>
+  </dialog>
+  <article id="print-sheet" class="print-sheet" aria-label="인쇄용 발주서"></article>
+  <noscript>발주 프로그램을 사용하려면 브라우저에서 JavaScript를 켜 주세요.</noscript>
+</body>
+</html>
