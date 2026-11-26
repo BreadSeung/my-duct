@@ -6,7 +6,7 @@ const orderPdf = (() => {
   const scale = 2;
   const margin = 44;
   const contentWidth = pageWidth - margin * 2;
-  const columnWidths = [43, 96, 153, 100, 43, 52, 105, 114];
+  const columnWidths = [43, 96, 173, 110, 43, 52, 189];
   const diagramWidth = 340;
   const colors = { ink: '#172c24', brand: '#255440', muted: '#4d6157', line: '#aebbb1', tint: '#e8f0e9',
     warning: '#824313', warningTint: '#f7eee1' };

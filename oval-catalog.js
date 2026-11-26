@@ -49,7 +49,7 @@ const ovalCatalog = (() => {
   const widths = new Map(chart.map(([nominal, firstDepth, ...row]) => [
     nominal, new Map(row.map((width, index) => [depths[depths.indexOf(firstDepth) + index], width])),
   ]));
-  const nominalSizes = [...widths.keys()];
+  const nominalSizes = [125, 150, 200, 250, 300, 350, 400];
   const stockLength = { key: 'length', label: '정척 (한 본 길이)', options: [4000, 2000], defaultValue: 4000 };
   const orientation = { key: 'orientation', label: '방향', options: ['V', 'H'], optionLabels: { V: 'V형 (세움)', H: 'H형 (눕힘)' } };
   const ovalEnd = (end, label) => [

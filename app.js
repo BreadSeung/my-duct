@@ -656,27 +656,32 @@
 
   function rowNotes(item) {
     const notes = [];
+    if (item.type === 'flex') {
+      const insulation = spiralCatalog.get(item.model).insulationLabel;
+      if (insulation !== '미사용') notes.push({ text: `보온재 ${insulation}` });
+    } else if (item.insulation && item.insulation !== 'none') {
+      notes.push({ text: `보온재 ${insulationText(item)}` });
+      if (item.hb) notes.push({ text: `HB ${item.hb}` });
+    }
+    if (item.reinforcementWidth) notes.push({ text: `갈바보강 ${format(item.reinforcementWidth)} mm` });
     const missing = missingDetails(item);
-    if (missing.length) notes.push(`${missing.join(' · ')} 확인 필요`);
-    if (item.memo) notes.push(item.memo);
-    return notes.join(' / ');
+    if (missing.length) notes.push({ text: `${missing.join(' · ')} 확인 필요`, warning: true });
+    if (item.memo) notes.push({ text: item.memo });
+    return notes;
   }
 
   function rowData(item) {
-    if (isAirOutlet(item.type)) return [specText(item), '—', '', '—', '—', '—', rowNotes(item)];
-    if (item.type === 'flex') {
-      const model = spiralCatalog.get(item.model);
-      return [specText(item), model.materialLabel, '', model.insulationLabel, '—', '—', rowNotes(item)];
-    }
-    return [specText(item), materials[item.material].label, item.plate === null ? '제품 표준' : `${item.plate}T`,
-      insulationText(item), item.insulation !== 'none' ? item.hb || '확인 필요' : '—',
-      item.reinforcementWidth ? `${format(item.reinforcementWidth)} mm` : '미설치', rowNotes(item)];
+    const spec = specText(item);
+    const notes = rowNotes(item);
+    if (isAirOutlet(item.type)) return [spec, '—', '', notes];
+    if (item.type === 'flex') return [spec, spiralCatalog.get(item.model).materialLabel, '', notes];
+    return [spec, materials[item.material].label, item.plate === null ? '제품 표준' : `${item.plate}T`, notes];
   }
 
   function buildTable(print = false) {
     const headers = print
-      ? ['번호', '품명', '규격 (mm)', '강판 / 판두께', '단위', '수량', '보온재 / HB', '갈바 보강 / 비고']
-      : ['품명 / 규격 (mm)', '강판 / 판두께', '수량', '보온재 / HB', '갈바 보강 / 비고'];
+      ? ['번호', '품명', '규격 (mm)', '강판 / 판두께', '단위', '수량', '비고']
+      : ['품명 / 규격 (mm)', '강판 / 판두께', '수량', '비고'];
     const table = el('table', undefined, print ? 'print-table' : 'items-table');
     const headerRow = table.createTHead().insertRow();
     if (!print) {
@@ -693,7 +698,7 @@
     screenBody?.setAttribute('role', 'rowgroup');
     for (const [index, item] of items.entries()) {
       const body = screenBody ?? table.createTBody();
-      const [spec, material, thickness, insulation, hb, reinforcement, notes] = rowData(item);
+      const [spec, material, thickness, notes] = rowData(item);
       const row = body.insertRow();
       if (print) {
         row.insertCell().textContent = index + 1;
@@ -718,22 +723,12 @@
       if (print) row.insertCell().textContent = unit;
       const quantity = el('strong', print ? format(item.quantity) : `${format(item.quantity)} ${unit}`, 'table-quantity');
       row.insertCell().append(quantity);
-      const insulationCell = row.insertCell();
-      insulationCell.append(el('span', insulation));
-      if (item.insulation !== 'none') insulationCell.append(el('small', item.hb ? `HB · ${hb}` : 'HB 확인 필요', item.hb ? '' : 'unconfirmed'));
-      const reinforcementCell = row.insertCell();
-      reinforcementCell.append(el('span', reinforcement));
-      if (notes) reinforcementCell.append(el('small', notes, missingDetails(item).length ? 'unconfirmed' : ''));
+      const notesCell = row.insertCell();
+      if (!print && notes.length) notesCell.append(el('span', '비고', 'mobile-label'));
+      for (const { text, warning } of notes) notesCell.append(el('small', text, warning ? 'unconfirmed' : ''));
       if (!print) {
         row.setAttribute('role', 'row');
-        for (const [column, cell] of [...row.cells].entries()) {
-          cell.setAttribute('role', 'cell');
-          if (column >= 3) {
-            const mobileLabel = el('span', column === 3 ? '보온재' : '갈바 보강', 'mobile-label');
-            mobileLabel.setAttribute('aria-hidden', 'true');
-            cell.prepend(mobileLabel);
-          }
-        }
+        for (const cell of row.cells) cell.setAttribute('role', 'cell');
       }
       if (item.type === 'offset') {
         const diagramRow = body.insertRow();
@@ -819,12 +814,12 @@
   function exportCsv() {
     const rows = [['한국닥트 발주서'], ...Object.entries(infoLabels).map(([key, label]) => [label, state.meta[key] || ''])];
     if (items.some(item => missingDetails(item).length)) rows.push(['문서 상태', '확인용 · 사양 미확정']);
-    rows.push([], ['품명', '규격 (mm)', '강판', '판두께', '단위', '수량', '보온재', 'HB', '갈바 보강', '비고']);
+    rows.push([], ['품명', '규격 (mm)', '강판', '판두께', '단위', '수량', '비고']);
     for (const item of items) {
-      const [spec, material, thickness, insulation, hb, reinforcement, notes] = rowData(item);
+      const [spec, material, thickness, notes] = rowData(item);
       const details = isCatalogItem(item.type) ? spiralCatalog.details(item, format) : [];
-      if (notes) details.push(notes);
-      rows.push([itemName(item), spec, material, thickness, itemUnit(item), item.quantity, insulation, hb, reinforcement, details.join(' / ')]);
+      details.push(...notes.map(note => note.text));
+      rows.push([itemName(item), spec, material, thickness, itemUnit(item), item.quantity, details.join(' / ')]);
     }
     const csv = rows.map(row => row.map(cell => {
       let value = String(cell);
@@ -951,11 +946,11 @@
       focusPart();
       return;
     }
-    if (!window.confirm(`${itemName(run)} ${specText(run)} 품목을 발주에서 삭제할까요?`)) return;
     state.runs = state.runs.filter(item => item.id !== run.id);
     if (editingId === run.id) fillForm();
     saveState();
     refreshOrder();
+    setMessage(`${itemName(run)} 품목을 삭제했습니다.`);
   });
 
   byId('cancel-edit').addEventListener('click', () => {

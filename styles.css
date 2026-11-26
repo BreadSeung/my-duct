@@ -266,7 +266,8 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
   }
   .items-table tbody td { padding: 0 5px 0 0; border: 0; }
   .items-table tbody td:first-child, .items-table tbody td:last-child { padding-inline: 0; }
-  .items-table td:nth-child(5) { grid-column: 2 / -1; }
+  .items-table tbody td:nth-child(4) { grid-column: 1 / -1; }
+  .items-table tbody td:nth-child(4):empty { display: none; }
   .items-table .order-offset-diagram td { grid-column: 1 / -1; }
   .items-table .table-spec { white-space: normal; overflow-wrap: anywhere; }
   .mobile-label { display: block; margin-bottom: 2px; color: var(--muted); font-size: 10px; }
@@ -312,11 +313,10 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
   .print-table th:nth-child(1) { width: 10mm; }
   .print-table th:nth-child(2) { width: 23mm; }
   .print-table td:nth-child(2) { word-break: keep-all; }
-  .print-table th:nth-child(3) { width: 38mm; }
-  .print-table th:nth-child(4) { width: 25mm; }
+  .print-table th:nth-child(3) { width: 43mm; }
+  .print-table th:nth-child(4) { width: 28mm; }
   .print-table th:nth-child(5) { width: 10mm; }
   .print-table th:nth-child(6) { width: 14mm; }
-  .print-table th:nth-child(7) { width: 32mm; }
   .print-table :is(th, td):is(:nth-child(1), :nth-child(5), :nth-child(6)) { text-align: center; }
   .print-table small { font-size: 7.5pt; }
   .print-total { padding: 3mm 1mm; border-bottom: .8pt solid #829788; text-align: right; font-weight: 750; break-inside: avoid; }

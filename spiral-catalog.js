@@ -162,7 +162,11 @@ const spiralCatalog = (() => {
     if (model.type === 'flex') return field.options;
     if (model.type === 'oval') {
       if (field.ovalDepth) return ovalCatalog.depthOptions(params[`d${field.ovalDepth}`]);
-      return field.diameter && !field.ovalEnd ? standardDiameters : field.options;
+      if (field.ovalEnd) {
+        const stored = storedParams?.[field.key];
+        return !field.options.includes(stored) && ovalCatalog.depthOptions(stored).length ? [...field.options, stored] : field.options;
+      }
+      return field.diameter ? standardDiameters : field.options;
     }
     if (!field.diameter || !isOrderModel(model.id)) return catalogOptions(model, field, params);
     let options = model.pairs ? standardDiameters.filter(value => catalogOptions(model, field, params).includes(value)) : standardDiameters;
@@ -180,7 +184,7 @@ const spiralCatalog = (() => {
     if (thickness !== null && (!Number.isFinite(thickness) || thickness <= 0)) return false;
     return model.fields.every(field => {
       const value = item.params[field.key];
-      const options = optionsFor(model, field, item.params);
+      const options = optionsFor(model, field, item.params, model.type === 'oval' ? item.params : undefined);
       if (!model.type && acceptsStoredDiameter(model, field, item.params, value)) return true;
       return options ? options.includes(value) : Number.isSafeInteger(value) && value > 0;
     });
