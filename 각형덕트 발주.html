@@ -6,6 +6,7 @@
   <title>발주서 | 한국닥트</title>
   <link rel="stylesheet" href="styles.css">
   <script defer src="calculations.js"></script>
+  <script defer src="oval-catalog.js"></script>
   <script defer src="spiral-catalog.js"></script>
   <script defer src="fitting-diagrams.js"></script>
   <script defer src="spiral-entry.js"></script>
@@ -59,9 +60,13 @@
               <div class="choices duct-families" role="group" aria-label="품목 분류">
                 <button id="choose-rect" class="button secondary" type="button" aria-pressed="true" aria-controls="rect-part-picker">각형덕트</button>
                 <button id="choose-spiral" class="button secondary" type="button" aria-pressed="false" aria-controls="spiral-part-picker">스파이럴덕트</button>
+                <button id="choose-oval" class="button secondary" type="button" aria-pressed="false" aria-controls="oval-part-picker">오발덕트</button>
+                <button id="choose-flex" class="button secondary" type="button" aria-pressed="false" aria-controls="flex-part-picker">플렉시블</button>
                 <button id="choose-outlet" class="button secondary" type="button" aria-pressed="false" aria-controls="outlet-part-picker" aria-label="그릴·레지스터·루버·디퓨저">그릴·디퓨저</button>
               </div>
               <input type="radio" name="type" value="spiral" hidden aria-hidden="true">
+              <input type="radio" name="type" value="oval" hidden aria-hidden="true">
+              <input type="radio" name="type" value="flex" hidden aria-hidden="true">
               <div id="rect-part-picker">
                 <fieldset>
                   <legend>품목 선택</legend>
@@ -113,8 +118,24 @@
                   <div id="spiral-branches" class="choices part-choices"></div>
                 </fieldset>
                 <fieldset class="part-group">
+                  <legend>행거</legend>
+                  <div id="spiral-hangers" class="choices part-choices"></div>
+                </fieldset>
+                <fieldset class="part-group">
                   <legend>원형댐퍼</legend>
                   <div id="spiral-dampers" class="choices part-choices damper-choices"></div>
+                </fieldset>
+              </div>
+              <div id="oval-part-picker" hidden>
+                <fieldset>
+                  <legend>오발 품목 선택</legend>
+                  <div id="oval-parts" class="choices part-choices"></div>
+                </fieldset>
+              </div>
+              <div id="flex-part-picker" hidden>
+                <fieldset>
+                  <legend>플렉시블 품목 선택</legend>
+                  <div id="flex-parts" class="choices part-choices"></div>
                 </fieldset>
               </div>
               <figure id="fitting-guide" class="fitting-guide" hidden>
@@ -122,9 +143,9 @@
                 <figcaption id="fitting-caption"></figcaption>
               </figure>
               <fieldset id="spiral-fields" class="spiral-fields" hidden disabled>
-                <legend>스파이럴 규격</legend>
+                <legend id="catalog-legend">스파이럴 규격</legend>
                 <div id="spiral-dimensions" class="dimension-fields"></div>
-                <div class="dimension-fields spiral-finish">
+                <div id="catalog-finish" class="dimension-fields spiral-finish">
                   <label>재질<select id="spiral-material" name="spiralMaterial">
                     <option value="galvanized">아연도금강판</option>
                     <option value="galvalume">갈바륨</option>

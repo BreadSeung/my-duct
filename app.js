@@ -1,9 +1,9 @@
 'use strict';
 
 (() => {
-  const { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels, format, positiveInteger,
+  const { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels, format, positiveInteger,
     hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, hbKey, insulationText, specText,
-    crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, splitRun, orderPieces, orderQuantity, quantityText, orderItems, missingDetails } = orderCalculations;
+    crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, splitRun, orderPieces, orderQuantity, quantityText, compareItems, orderItems, missingDetails } = orderCalculations;
   const storageKey = 'hanguk-duct-order-v1';
   const byId = id => document.getElementById(id);
   const form = byId('entry-form');
@@ -17,6 +17,8 @@
   const partGroups = {
     rect: { button: byId('choose-rect'), picker: byId('rect-part-picker'), type: 'straight' },
     spiral: { button: byId('choose-spiral'), picker: byId('spiral-part-picker'), type: 'spiral' },
+    oval: { button: byId('choose-oval'), picker: byId('oval-part-picker'), type: 'oval' },
+    flex: { button: byId('choose-flex'), picker: byId('flex-part-picker'), type: 'flex' },
     outlet: { button: byId('choose-outlet'), picker: byId('outlet-part-picker'), type: 'grille' }
   };
   const choiceDefaults = { material: 'galvanized', insulation: 'none', reinforcement: 'no', level: 'center', side: 'center' };
@@ -65,7 +67,7 @@
 
   function currentDraft() {
     const draft = { ...Object.fromEntries(draftFields.map(name => [name, fields[name].value])), editingId };
-    if (fields.type.value === 'spiral') draft.spiral = spiral.read();
+    if (isCatalogItem(fields.type.value)) draft.spiral = spiral.read();
     if (!diffusers[draft.type]) {
       draft.diffuserNominal = '';
       draft.diffuserModel = '';
@@ -116,9 +118,10 @@
 
   function hasWork({ meta, runs, draft }) {
     const round = draft.spiral;
-    const spiralWork = round && (round.model !== 'SP' || round.material !== choiceDefaults.material
+    const defaultModel = { spiral: 'SP', oval: 'OD', flex: 'flex-al' }[draft.type];
+    const spiralWork = round && (round.model !== defaultModel || (round.material && round.material !== choiceDefaults.material)
       || (round.spiralThickness != null && round.spiralThickness !== spiralCatalog.defaultThickness)
-      || round.params.d1 || round.params.runLength || round.params.length !== 4000);
+      || Object.entries(round.params).some(([key, value]) => key === 'length' ? value !== 4000 : value));
     return runs.length || Object.keys(infoLabels).some(name => name !== 'orderDate' && meta[name])
       || (meta.orderDate || '') !== today()
       || spiralWork || draft.repeat !== '1' || draftFields.some(name => !['type', 'repeat'].includes(name) && draft[name] && draft[name] !== choiceDefaults[name]);
@@ -291,9 +294,9 @@
   }
 
   function readConditions(geometry) {
-    if (isAirOutlet(geometry.type)) return { material: null, insulation: 'none', artilon: null };
+    if (isAirOutlet(geometry.type) || geometry.type === 'flex') return { material: null, insulation: 'none', artilon: null };
     const insulation = fields.insulation.value || choiceDefaults.insulation;
-    const material = geometry.type === 'spiral' ? geometry.material : fields.material.value;
+    const material = isCatalogItem(geometry.type) ? geometry.material : fields.material.value;
     return { material: material || choiceDefaults.material, insulation,
       artilon: insulation === 'artilon' && Number(fields.artilon.value) > 0 ? Number(fields.artilon.value) : null };
   }
@@ -351,7 +354,7 @@
 
   function readGeometry(size) {
     const type = fields.type.value;
-    if (type === 'spiral') return spiral.read();
+    if (isCatalogItem(type)) return spiral.read();
     if (elbowAngles[type]) return { type, radius: fields.radius.value === '' ? null : Number(fields.radius.value) };
     if (type === 'offset') {
       const choice = fields.includeInlet.value;
@@ -376,7 +379,8 @@
 
   function validGeometry(geometry) {
     const { type, length, radius, rise, inlet, level, side, cutLength } = geometry;
-    if (type === 'spiral') return spiralCatalog.valid(geometry) && ['galvanized', 'galvalume', 'sts304'].includes(geometry.material);
+    if (isCatalogItem(type)) return spiralCatalog.valid(geometry)
+      && (type === 'flex' || ['galvanized', 'galvalume', 'sts304'].includes(geometry.material));
     if (elbowAngles[type]) return Number.isSafeInteger(radius) && radius >= 0;
     if (type === 'offset') return positiveInteger(length) && length <= offsetMaxLength && positiveInteger(rise)
       && (inlet === null || (positiveInteger(inlet) && inlet < length / 2));
@@ -397,8 +401,8 @@
   function syncGeometry(geometry) {
     const { type } = geometry;
     const straight = type === 'straight';
-    const round = type === 'spiral';
-    const spiralStock = round && geometry.model === 'SP';
+    const round = isCatalogItem(type);
+    const catalogStock = round && spiralCatalog.isStock(geometry.model);
     const offset = type === 'offset';
     const reducer = type === 'reducer';
     const branch = type === 'branch';
@@ -408,7 +412,7 @@
     const outletNeck = airOutlet && !diffuser;
     const manualDiffuser = diffuser && fields.diffuserNominal.value === 'legacy';
     const showSection = !round && (!diffuser || manualDiffuser);
-    const selectedGroup = round ? partGroups.spiral : airOutlet ? partGroups.outlet : partGroups.rect;
+    const selectedGroup = round ? partGroups[type] : airOutlet ? partGroups.outlet : partGroups.rect;
     selectedGroup.type = type;
     for (const group of Object.values(partGroups)) {
       const selected = group === selectedGroup;
@@ -445,15 +449,18 @@
     byId('damper-length-value').textContent = `${format(damperLength)} mm`;
     byId('rect-material-section').hidden = round || airOutlet;
     byId('rect-material-options').disabled = round || airOutlet;
-    byId('insulation-section').hidden = airOutlet;
-    byId('insulation-options').disabled = airOutlet;
-    byId('quantity-label').textContent = straight || spiralStock ? '같은 구간 수' : `수량 (${itemUnit(geometry)})`;
+    byId('insulation-section').hidden = airOutlet || type === 'flex';
+    byId('insulation-options').disabled = airOutlet || type === 'flex';
+    byId('quantity-label').textContent = straight || catalogStock ? '같은 구간 수' : `수량 (${itemUnit(geometry)})`;
     byId('fitting-guide').hidden = false;
-    byId('stock-label').hidden = !straight && !spiralStock;
+    byId('stock-label').hidden = !straight && !catalogStock;
     if (straight) byId('stock-label').textContent = geometry.cutLength === undefined
       ? `정척 ${format(stockLength)} mm` : positiveInteger(geometry.cutLength) ? `분할 기준 ${format(geometry.cutLength)} mm` : '분할 기준 확인';
-    if (spiralStock) byId('stock-label').textContent = `정척 ${spiralCatalog.stockLengthText(geometry.params.length)}`;
-    byId('cut-title').textContent = straight || spiralStock ? '절단 미리보기' : '제작 규격 미리보기';
+    if (catalogStock) {
+      const length = spiralCatalog.stockLengthText(spiralCatalog.stockLengthFor(geometry));
+      byId('stock-label').textContent = type === 'flex' ? `${length} / 1박스` : `정척 ${length}`;
+    }
+    byId('cut-title').textContent = type === 'flex' ? '발주 박스 수' : straight || catalogStock ? '절단 미리보기' : '제작 규격 미리보기';
     const diagram = byId('fitting-diagram');
     if (round) {
       const model = spiralCatalog.get(geometry.model);
@@ -462,13 +469,18 @@
         diagram.dataset.choice = diagramChoice;
         drawSpiralDiagram(diagram, model, geometry.params);
       }
-      const measurements = model.fields.filter(field => !spiralStock || field.diameter)
-        .map(field => [field.label, geometry.params[field.key]]);
+      const measurements = model.fields.filter(field => !catalogStock || field.diameter || field.ovalDepth)
+        .flatMap(field => {
+          const value = geometry.params[field.key];
+          return field.ovalDepth ? [['깊이 D', value], ['너비 W', ovalCatalog.widthFor(geometry.params[`d${field.ovalDepth}`], value)]]
+            : [[field.label, value]];
+        });
       if (model.fixedLength) measurements.push(['L', model.fixedLength]);
       const values = [measurementDescription(measurements),
-        spiralStock ? `정척 ${spiralCatalog.stockLengthText(geometry.params.length)}` : ''].filter(Boolean).join(', ');
+        catalogStock ? byId('stock-label').textContent : ''].filter(Boolean).join(', ');
       diagram.setAttribute('aria-label', values ? `${model.name} 치수 안내 그림. ${values}` : `${model.name} 치수 안내 그림`);
-      byId('fitting-caption').textContent = model.damper ? model.name : `${model.code} · ${model.name}`;
+      const code = type === 'oval' ? ovalCatalog.code(model, geometry.params) : type === 'spiral' && !model.damper ? model.code : '';
+      byId('fitting-caption').textContent = [code, model.name].filter(Boolean).join(' · ');
       return;
     }
     const size = diffuser && !manualDiffuser ? dimensions() ?? {} : {
@@ -505,8 +517,8 @@
   }
 
   function syncForm(restoreHb = false) {
-    const round = fields.type.value === 'spiral';
-    spiral.sync(round);
+    const round = isCatalogItem(fields.type.value);
+    spiral.sync(fields.type.value);
     syncDiffuser();
     const size = round ? null : dimensions();
     const geometry = readGeometry(size);
@@ -559,10 +571,10 @@
   function renderPreview(size, geometry) {
     const container = byId('cut-preview');
     const type = geometry.type;
-    const spiralStock = type === 'spiral' && geometry.model === 'SP';
+    const catalogStock = isCatalogItem(type) && spiralCatalog.isStock(geometry.model);
     const run = { ...size, ...geometry, repeat: Number(fields.repeat.value) };
     const pieces = validGeometry(run) ? orderPieces(run) : [];
-    if ((!size && type !== 'spiral') || !pieces.length) {
+    if ((!size && !isCatalogItem(type)) || !pieces.length) {
       const elbowHint = '가로 × 세로, 안쪽 반경 R, 수량을 입력하세요.';
       const hints = {
         straight: '가로 × 세로와 전체 길이를 입력하면 정척과 짧은 덕트의 수량이 계산됩니다.',
@@ -572,19 +584,27 @@
         reducer: '입구·출구 치수와 길이 L을 입력하고 높이·폭 정렬을 선택하세요.',
         branch: '기준 단면의 가로와 세로를 입력하면 반대쪽 치수가 계산됩니다.',
         spiral: '제품 모델에서 지름과 치수를 선택하면 발주 규격이 표시됩니다.',
+        oval: '호칭 지름과 깊이 D / 너비 W를 선택하세요.',
+        flex: '지름과 필요 길이를 입력하면 발주 박스 수가 표시됩니다.',
       };
       const tooLong = type === 'offset' && geometry.length > offsetMaxLength;
       const diffuserHint = fields.diffuserNominal.value === 'legacy' ? '전면 치수와 목 지름을 입력하세요.'
         : fields.diffuserModel.required ? 'Face(D) 또는 모델을 선택하세요.' : '호칭 지름을 선택하세요.';
       const hint = tooLong ? `고바이 총길이 L은 ${format(offsetMaxLength)} mm까지 입력할 수 있습니다.`
-        : spiralStock ? '지름과 전체 길이를 입력하면 절단 치수와 발주 본수가 표시됩니다.'
+        : catalogStock && type !== 'flex' ? '단면 규격과 전체 길이를 입력하면 절단 치수와 발주 본수가 표시됩니다.'
           : hints[type] ?? (diffusers[type] ? diffuserHint : '목 안쪽의 가로·세로를 입력하세요.');
       container.replaceChildren(el('p', hint, 'cut-empty'));
       return;
     }
     const list = el('ul', undefined, 'cut-list');
-    if (spiralStock) {
-      const { length, runLength } = geometry.params;
+    if (type === 'flex') {
+      const [purchase] = pieces;
+      container.replaceChildren(el('p', `발주 ${specText({ ...geometry, ...purchase })} · ${format(purchase.quantity)} 박스`, 'cut-stock-total'));
+      return;
+    }
+    if (catalogStock) {
+      const { runLength } = geometry.params;
+      const length = spiralCatalog.stockLengthFor(geometry);
       for (const cut of splitRun(runLength, run.repeat, length)) {
         const row = el('li');
         const stock = cut.length === length;
@@ -602,7 +622,7 @@
       const row = el('li');
       const splitLength = geometry.cutLength ?? stockLength;
       const label = type === 'straight' ? (piece.length === splitLength ? (geometry.cutLength === undefined ? '정척' : '기준 길이') : '짧은 덕트')
-        : type === 'spiral' ? spiralCatalog.get(geometry.model).code : dampers[type] ?? ductNames[type];
+        : isCatalogItem(type) ? spiralCatalog.details(geometry, format)[0] || itemName(geometry) : dampers[type] ?? ductNames[type];
       row.append(el('span', label, 'piece-type'), el('strong', specText({ ...run, ...piece })),
         el('span', `${format(piece.quantity)} ${itemUnit(geometry)}`, 'piece-quantity'));
       list.append(row);
@@ -612,7 +632,7 @@
 
   function fillForm(values = {}, id = null) {
     form.reset();
-    spiral.restore(values.spiral);
+    spiral.reset(values.spiral, values.type);
     // Earlier drafts saved the cross-section in a single text field.
     const restored = { ...(values.size ? parseDimensions(values.size) : null), ...values };
     legacyDiffuserType = wasManualDiffuser(restored) ? restored.type : undefined;
@@ -644,6 +664,10 @@
 
   function rowData(item) {
     if (isAirOutlet(item.type)) return [specText(item), '—', '', '—', '—', '—', rowNotes(item)];
+    if (item.type === 'flex') {
+      const model = spiralCatalog.get(item.model);
+      return [specText(item), model.materialLabel, '', model.insulationLabel, '—', '—', rowNotes(item)];
+    }
     return [specText(item), materials[item.material].label, item.plate === null ? '제품 표준' : `${item.plate}T`,
       insulationText(item), item.insulation !== 'none' ? item.hb || '확인 필요' : '—',
       item.reinforcementWidth ? `${format(item.reinforcementWidth)} mm` : '미설치', rowNotes(item)];
@@ -677,14 +701,17 @@
       const specCell = row.insertCell();
       if (!print) specCell.append(el('div', itemName(item), 'table-item-name'));
       const twoEnds = hasTwoEnds(item.type);
-      const specificationClass = item.type === 'spiral' ? 'table-spec spiral-spec' : 'table-spec';
+      const specificationClass = isCatalogItem(item.type) ? 'table-spec spiral-spec' : 'table-spec';
       specCell.append(el('strong', twoEnds || item.type === 'offset' ? crossSectionText(item) : spec, specificationClass));
       if (twoEnds) {
         specCell.append(el('strong', ` → ${outletSectionText(item)}`, 'table-spec second-section'),
           el('small', twoEndDetails(item), 'table-fitting-details'));
       }
       if (item.type === 'offset') specCell.append(el('small', offsetDetails(item), 'table-fitting-details'));
-      if (item.type === 'spiral') specCell.append(el('small', spiralCatalog.details(item, format).join(' · '), 'table-fitting-details'));
+      if (isCatalogItem(item.type)) {
+        const details = spiralCatalog.details(item, format);
+        if (details.length) specCell.append(el('small', details.join(' · '), 'table-fitting-details'));
+      }
       row.insertCell().append(el('span', material), el('small', thickness));
       const unit = itemUnit(item);
       if (print) row.insertCell().textContent = unit;
@@ -714,13 +741,15 @@
   function renderRuns() {
     const list = byId('run-list');
     list.replaceChildren();
-    for (const [index, run] of state.runs.entries()) {
+    const sortedRuns = [...state.runs].sort(compareItems);
+    for (const [index, run] of sortedRuns.entries()) {
       const row = el('li', undefined, 'run');
       const text = el('div');
       const type = ductType(run);
-      const details = isAirOutlet(type) ? []
+      const details = isAirOutlet(type) || type === 'flex' ? []
         : [materials[run.material].label, insulationText(run), run.reinforcementWidth ? `보강 ${format(run.reinforcementWidth)} mm` : '보강 미설치'];
-      const quantity = run.repeat > 1 ? ` · ${format(run.repeat)}${type === 'straight' ? '구간' : ` ${itemUnit(run)}`}` : '';
+      const quantity = type === 'flex' ? ` · ${format(orderQuantity(run))} 박스`
+        : run.repeat > 1 ? ` · ${format(run.repeat)}${type === 'straight' || isCatalogItem(type) && spiralCatalog.isStock(run.model) ? '구간' : ` ${itemUnit(run)}`}` : '';
       const spec = type === 'straight' ? crossSectionText(run) : specText(run);
       const separator = diffusers[type] ? ' ' : ' · ';
       text.append(el('strong', `${itemName(run)}${separator}${spec}${quantity}`));
@@ -780,7 +809,7 @@
     rows.push([], ['품명', '규격 (mm)', '강판', '판두께', '단위', '수량', '보온재', 'HB', '갈바 보강', '비고']);
     for (const item of items) {
       const [spec, material, thickness, insulation, hb, reinforcement, notes] = rowData(item);
-      const details = item.type === 'spiral' ? spiralCatalog.details(item, format) : [];
+      const details = isCatalogItem(item.type) ? spiralCatalog.details(item, format) : [];
       if (notes) details.push(notes);
       rows.push([itemName(item), spec, material, thickness, itemUnit(item), item.quantity, insulation, hb, reinforcement, details.join(' / ')]);
     }
@@ -832,7 +861,7 @@
 
   form.addEventListener('submit', event => {
     event.preventDefault();
-    const round = fields.type.value === 'spiral';
+    const round = isCatalogItem(fields.type.value);
     const size = round ? null : dimensions();
     if (!size && !round) {
       if (diffusers[fields.type.value] && fields.diffuserNominal.value !== 'legacy') {
@@ -876,7 +905,7 @@
     if (wasEditing) state.runs = state.runs.map(previous => previous.id === editingId ? run : previous);
     else state.runs.push(run);
     const spiralDefaults = round && spiralCatalog.isOrderModel(run.model)
-      ? { model: run.model, params: run.model === 'SP' ? { length: run.params.length } : undefined } : undefined;
+      ? { model: run.model, params: run.params.length && spiralCatalog.isStock(run.model) ? { length: run.params.length } : undefined } : undefined;
     fillForm({ type: run.type, spiral: spiralDefaults });
     saveState();
     refreshOrder();
@@ -885,7 +914,7 @@
   });
 
   function focusPart(preventScroll = false) {
-    const field = fields.type.value === 'spiral' ? form.querySelector('[name="spiral-d1"]')
+    const field = isCatalogItem(fields.type.value) ? form.querySelector('[name="spiral-d1"]')
       : diffusers[fields.type.value] ? fields.diffuserNominal : fields.width;
     field.focus({ preventScroll });
   }
@@ -899,7 +928,7 @@
       const preset = [100, 150, 200].includes(run.reinforcementWidth);
       const type = ductType(run);
       fillForm({ ...run, type, length: type === 'straight' ? run.length : '',
-        spiral: type === 'spiral' ? run : undefined,
+        spiral: isCatalogItem(type) ? run : undefined,
         offsetLength: type === 'offset' ? run.length : '', includeInlet: type === 'offset' ? (run.inlet === null ? 'no' : 'yes') : '',
         reducerLength: type === 'reducer' ? run.length : '',
         reinforcement: run.reinforcementWidth ? 'yes' : 'no',

@@ -10,7 +10,7 @@ const spiralCatalog = (() => {
     450, 475, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300,
     1350, 1400, 1450, 1500];
   const pressedElbows = [75, 80, 100, 125, 150, 160, 175, 180, 200, 250, 300];
-  const standardFittingDiameters = [75, 100, 125, 150, 200, 250, 300, 350, 400, 450, 500];
+  const standardDiameters = [75, 100, 125, 150, 200, 250, 300, 350, 400, 450, 500];
   const pressedCaps = [100, 125, 150, 200, 250, 300];
   const thicknessChoices = Object.freeze([0.5, 0.6, 0.8]);
   const defaultThickness = 0.6;
@@ -33,7 +33,7 @@ const spiralCatalog = (() => {
   const tee = [diam('d1', '본관 시작 Ød1'), diam('d2', '본관 끝 Ød2'), diam('d3', '분기 Ød3')];
   const cross = [...tee, diam('d4', '반대 분기 Ød4')];
   const twin = [diam('d1', '공통 지름 Ød1'), diam('d3', '분기 Ød3'), diam('d4', '분기 Ød4')];
-  const pressed = [diam('d1', '접속 지름 Ød1 = Ød2', standardFittingDiameters)];
+  const pressed = [diam('d1', '접속 지름 Ød1 = Ød2', pressedElbows)];
   const transition = [measure('l1', '사각 가로 l1'), measure('l2', '사각 세로 l2'), diam('d1', '원형 지름 Ød1')];
   const diameterPair = table => [diam('d1', '큰 쪽 지름 Ød1', keysAsNumbers(table)), diam('d2', '작은 쪽 지름 Ød2', [])];
   const model = (code, name, shape, fields = one, extra = {}) => ({ code, id: code, name, shape, fields, ...extra });
@@ -46,8 +46,8 @@ const spiralCatalog = (() => {
       { key: 'length', label: '정척 (한 본 길이)', options: [4000, 2000], defaultValue: 4000 },
       measure('runLength', '한 구간 전체 길이 L')])] },
     { name: '엘보', page: 5, models: [
-      ...pair('EB90', '90° 엘보', 'elbow90', pressed, { legacyDiameters: pressedElbows }),
-      ...pair('EB45', '45° 엘보', 'elbow45', pressed, { legacyDiameters: pressedElbows }),
+      ...pair('EB90', '90° 엘보', 'elbow90', pressed),
+      ...pair('EB45', '45° 엘보', 'elbow45', pressed),
       ...pair('EBS90', '90° 편 엘보', 'elbow90', [diam('d1', '기준 지름 Ød1', keysAsNumbers(elbow90)), ends[1]], { elbowLength: elbow90, checkCombination: true }),
       ...pair('EBS45', '45° 편 엘보', 'elbow45', [diam('d1', '기준 지름 Ød1', keysAsNumbers(elbow45)), ends[1]], { elbowLength: elbow45, checkCombination: true }),
       ...pair('TWEB90', '90° 트윈엘보', 'twin', twin, { checkCombination: true }),
@@ -73,10 +73,10 @@ const spiralCatalog = (() => {
       ...pair('CRYTB', '크로스 YT 브랜치', 'crossY', cross, { checkCombination: true }),
       ...pair('RCRYTB', '리듀싱 크로스 YT 브랜치', 'crossY', cross, { checkCombination: true }),
       ...pair('TWB', '바지관', 'twin', twin, { checkCombination: true }),
-      ...pair('SD', '새들', 'saddle', [diam('d1', '본관 지름 Ød', keysAsNumbers(saddlePairs)), diam('d3', '분기 지름 Ød3', [])], { pairs: saddlePairs }),
+      ...pair('SD', '새들', 'saddle', [diam('d1', '본관 지름 Ød', keysAsNumbers(saddlePairs)), diam('d3', '분기 지름 Ød3', [])], { branch: true, pairs: saddlePairs }),
     ] },
     { name: '커플링 · 리듀서', page: 7, models: [
-      model('CPM', '커플링', 'coupling', [diam('d1', '접속 지름 Ø', standardFittingDiameters)], { legacyDiameters: fittingDiameters }),
+      model('CPM', '커플링', 'coupling'),
       model('CPMF1', '한쪽 플랜지 커플링', 'coupling'),
       model('CPMF2', '양쪽 플랜지 커플링', 'coupling'), model('CPMG', '가스켓 커플링', 'coupling'),
       model('CPMSP', '스핀형 커플링', 'coupling'), model('CPF', '피팅용 커플링', 'coupling'),
@@ -84,7 +84,8 @@ const spiralCatalog = (() => {
       ...pair('RDP', '프레스 리듀서', 'reducer', diameterPair(pressedReducerPairs), { pairs: pressedReducerPairs }),
     ] },
     { name: '캡 · 삿갓 · 플랫덕트', page: 7, models: [
-      ...pair('CAPM', '캡', 'cap'),
+      model('CAPM', '캡', 'cap'),
+      model('CAPMG', '캡 · 가스켓', 'capGasket'),
       model('CAPMP', '프레스 캡 (CAPMP)', 'cap', [diam('d1', '접속 지름 Ø', pressedCaps)]),
       model('CAPFP', '프레스 캡 (CAPFP)', 'cap', [diam('d1', '접속 지름 Ø', pressedCaps)]),
       model('SGNH', '행거형 삿갓', 'hood'), model('SGNC', '소켓형 삿갓', 'hood'),
@@ -96,10 +97,11 @@ const spiralCatalog = (() => {
       model('TR', '트랜지션 (홉빠)', 'transition', [...transition, { key: 'flange', label: '플랜지 마감', options: Object.keys(flangeOptions) }]),
       model('TRTDF', '트랜지션 (TDF)', 'transition', transition),
       model('TO', '테이크오프', 'takeoff', [diam('d1', '접속 지름 Ø', [75, 100, 125, 150, 200, 250, 300])]),
-      model('VB', 'V밴드', 'band'), model('HG', 'O자형 행거', 'band', one, { hardware: '볼트·너트 포함' }),
-      model('UB', 'U자형 행거', 'band', one, { hardware: '볼트·너트 별도' }),
-      model('HGR', '반달형 행거', 'band', one, { hardware: '볼트·너트 포함 · 2개 1조', unit: '조' }),
-      model('HGS', '단축 행거', 'band', one, { hardware: '볼트·너트 별도' }),
+      model('VB', 'V밴드', 'band'),
+      model('HG', 'O자형 행거', 'hangerRound', one, { hardware: '볼트·너트 포함' }),
+      model('UB', 'U자형 행거', 'hangerU', one, { hardware: '볼트·너트 별도' }),
+      model('HGR', '반달형 행거', 'hangerHalf', one, { hardware: '볼트·너트 포함 · 2개 1조', unit: '조' }),
+      model('HGS', '단축 행거', 'hangerShort', one, { hardware: '볼트·너트 별도' }),
     ] },
   ];
   const models = new Map();
@@ -112,45 +114,91 @@ const spiralCatalog = (() => {
     }
   }
   // Removed models still describe items that already exist in saved orders and drafts.
-  const orderModels = ['SP', 'EB45', 'EB90', 'CPM', 'TO', 'CNT', 'CMT', 'RT', 'YB', 'YTB', 'RD'].map(id => models.get(id));
+  const orderModels = ['SP', 'EB45', 'EB90', 'CPM', 'CAPM', 'CAPMG', 'TO', 'CNT', 'CMT', 'RT', 'YB', 'YTB', 'SD', 'RD',
+    'HG', 'UB', 'HGR', 'HGS'].map(id => models.get(id));
   const { dampers, damperLength } = orderCalculations;
   for (const [damper, code] of Object.entries(dampers)) {
-    const item = model(code, `원형 ${code} 댐퍼`, 'damper', [diam('d1', '접속 지름 Ø', standardFittingDiameters)],
+    const item = model(code, `원형 ${code} 댐퍼`, 'damper', one,
       { id: `damper-${damper}`, damper, fixedLength: damperLength });
     models.set(item.id, item);
     orderModels.push(item);
   }
-  const isOrderModel = id => orderModels.some(model => model.id === id);
+  for (const item of ovalCatalog.models) {
+    models.set(item.id, item);
+    orderModels.push(item);
+  }
+  for (const [id, name, material, page, insulation] of [
+    ['flex-al', 'A/L (알루미늄)', '알루미늄', '5-1', '미사용'],
+    ['flex-al-pet', '보온 A/L 크린솜', '알루미늄', '5-1', '크린솜'],
+    ['flex-tp', 'T.P (타포린)', '타포린', '5-3', '미사용'],
+    ['flex-tp-pet', '보온 T.P 크린솜', '타포린', '5-3', '크린솜'],
+  ]) {
+    const insulated = insulation === '크린솜';
+    const fields = [diam('d1', '접속 지름 Ø', insulated ? standardDiameters.slice(1) : standardDiameters),
+      { key: 'runLength', label: '필요 길이 (m)', meters: true }];
+    const item = model(id, `플렉시블 ${name}`, insulated ? 'flexInsulated' : 'flexDuct', fields,
+      { type: 'flex', choiceLabel: name, stockLength: 10000, unit: '박스', materialLabel: material, insulationLabel: insulation, page });
+    models.set(item.id, item);
+    orderModels.push(item);
+  }
+  const orderModelRanks = new Map(orderModels.map((model, index) => [model.id, index]));
+  const isOrderModel = id => orderModelRanks.has(id);
+  const compareModels = (a, b) => (orderModelRanks.get(a) ?? orderModels.length) - (orderModelRanks.get(b) ?? orderModels.length)
+    || a.localeCompare(b);
 
-  function optionsFor(model, field, params) {
+  function catalogOptions(model, field, params) {
     if (model.pairs && field !== model.fields[0]) return model.pairs[params.d1] || [];
     if (model.reduction && field.key === 'd2') return params.d1 ? field.options.filter(value => value < params.d1) : [];
     return field.options;
   }
 
-  function acceptsLegacyDiameter(model, diameter) {
-    return model.damper ? Number.isSafeInteger(diameter) && diameter > 0 : Boolean(model.legacyDiameters?.includes(diameter));
+  function acceptsStoredDiameter(model, field, params, value) {
+    if (!field.diameter) return false;
+    if (model.damper) return Number.isSafeInteger(value) && value > 0;
+    return catalogOptions(model, field, params)?.includes(value) ?? false;
+  }
+
+  function optionsFor(model, field, params, storedParams) {
+    if (model.type === 'flex') return field.options;
+    if (model.type === 'oval') {
+      if (field.ovalDepth) return ovalCatalog.depthOptions(params[`d${field.ovalDepth}`]);
+      return field.diameter && !field.ovalEnd ? standardDiameters : field.options;
+    }
+    if (!field.diameter || !isOrderModel(model.id)) return catalogOptions(model, field, params);
+    let options = model.pairs ? standardDiameters.filter(value => catalogOptions(model, field, params).includes(value)) : standardDiameters;
+    if (model.reduction && field.key === 'd1') options = standardDiameters.slice(1);
+    if (model.reduction && field.key === 'd2') options = standardDiameters.filter(value => value < params.d1);
+    const stored = storedParams?.[field.key];
+    return !options.includes(stored) && acceptsStoredDiameter(model, field, params, stored) ? [...options, stored] : options;
   }
 
   function valid(item) {
     const model = models.get(item.model);
-    if (!model || !item.params) return false;
+    if (!model || !item.params || (model.type ?? 'spiral') !== item.type) return false;
     const thickness = item.spiralThickness;
     // Older orders can still carry a manually entered thickness or a product standard.
     if (thickness !== null && (!Number.isFinite(thickness) || thickness <= 0)) return false;
     return model.fields.every(field => {
       const value = item.params[field.key];
       const options = optionsFor(model, field, item.params);
-      if (field.key === 'd1' && acceptsLegacyDiameter(model, value)) return true;
+      if (!model.type && acceptsStoredDiameter(model, field, item.params, value)) return true;
       return options ? options.includes(value) : Number.isSafeInteger(value) && value > 0;
     });
   }
 
   const stockLengthText = length => `${length / 1000}M`;
+  const isStock = id => id === 'SP' || id === 'OD' || models.get(id)?.type === 'flex';
+  const stockLengthFor = item => models.get(item.model)?.stockLength ?? item.params.length;
 
   function spec(item, format) {
     const model = models.get(item.model);
     const params = item.params;
+    if (model.type === 'flex') return `Ø${format(params.d1)} × ${stockLengthText(model.stockLength)}`;
+    if (model.type === 'oval') {
+      const parts = ovalCatalog.specParts(model, params, format);
+      if (model.id === 'OD') parts.push(stockLengthText(params.length));
+      return parts.join(' · ');
+    }
     const parts = model.fields.filter(field => field.key !== 'flange' && field.key !== 'runLength').map(field => {
       const value = params[field.key];
       if (field.diameter) return `Ø${format(value)}`;
@@ -165,6 +213,11 @@ const spiralCatalog = (() => {
   function details(item, format) {
     const model = models.get(item.model);
     if (!model) return [];
+    if (model.type === 'flex') return [`${stockLengthText(model.stockLength)} / 박스`];
+    if (model.type === 'oval') {
+      const code = ovalCatalog.code(model, item.params);
+      return code ? [code] : [];
+    }
     const length = model.elbowLength?.[item.params.d1];
     const entries = [model.code];
     if (length) entries.push(`L${format(length)}${model.checkCombination ? ' (Ød1 기준)' : ''}`);
@@ -173,6 +226,6 @@ const spiralCatalog = (() => {
     return entries;
   }
 
-  return { orderModels, isOrderModel, get: id => models.get(id), optionsFor, valid, spec, details, flangeOptions,
-    acceptsLegacyDiameter, stockLengthText, thicknessChoices, defaultThickness };
+  return { orderModels, isOrderModel, compareModels, get: id => models.get(id), optionsFor, valid, spec, details, flangeOptions,
+    isStock, stockLengthFor, stockLengthText, thicknessChoices, defaultThickness };
 })();

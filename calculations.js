@@ -42,15 +42,17 @@ const orderCalculations = (() => {
   const isAirOutlet = type => Object.hasOwn(outlets, type);
   const ductNames = {
     straight: '각형덕트', elbow: '90° 엘보', elbow45: '45° 엘보', offset: '고바이', reducer: '레두샤', branch: '분기구',
-    ...Object.fromEntries(Object.entries(dampers).map(([type, code]) => [type, `각형 ${code} 댐퍼`])), ...outlets, spiral: '스파이럴덕트'
+    ...Object.fromEntries(Object.entries(dampers).map(([type, code]) => [type, `각형 ${code} 댐퍼`])),
+    spiral: '스파이럴덕트', oval: '오발덕트', flex: '플렉시블 덕트', ...outlets
   };
   const elbowAngles = { elbow: 90, elbow45: 45 };
   const levelLabels = { top: '상수평', bottom: '하수평', center: '중심' };
   const sideLabels = { center: '양고', left: '좌편심', right: '우편심' };
   const typeOrder = Object.keys(ductNames);
   const ductType = item => item.type ?? 'straight';
-  const itemName = item => item.type === 'spiral' ? spiralCatalog.get(item.model)?.name || ductNames.spiral : ductNames[ductType(item)];
-  const itemUnit = item => item.type === 'spiral' ? spiralCatalog.get(item.model)?.unit || 'EA' : 'EA';
+  const isCatalogItem = type => type === 'spiral' || type === 'oval' || type === 'flex';
+  const itemName = item => (isCatalogItem(item.type) ? spiralCatalog.get(item.model)?.name : null) || ductNames[ductType(item)];
+  const itemUnit = item => (isCatalogItem(item.type) ? spiralCatalog.get(item.model)?.unit : null) || 'EA';
   const numberFormat = new Intl.NumberFormat('ko-KR');
   const format = value => numberFormat.format(value);
   const positiveInteger = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
@@ -76,8 +78,8 @@ const orderCalculations = (() => {
 
   function plateThickness(material, dimensions) {
     if (!dimensions) return null;
-    if (isAirOutlet(dimensions.type)) return null;
-    if (dimensions.type === 'spiral') return dimensions.spiralThickness ?? null;
+    if (isAirOutlet(dimensions.type) || dimensions.type === 'flex') return null;
+    if (isCatalogItem(dimensions.type)) return dimensions.spiralThickness ?? null;
     const sideLength = longSide(dimensions);
     if (sideLength > thickThreshold) return 0.8;
     if (!Object.hasOwn(materials, material)) return null;
@@ -96,9 +98,9 @@ const orderCalculations = (() => {
 
   function hbKey({ type, width, height, outletWidth, outletHeight, insulation, artilon, model, params }) {
     let ends = hasTwoEnds(type) ? `${type}|${width}x${height}>${outletWidth}x${outletHeight}` : `${width}x${height}`;
-    if (type === 'spiral') {
-      const profile = spiralCatalog.get(model).fields.filter(field => field.diameter || ['width', 'height', 'l1', 'l2'].includes(field.key));
-      ends = `spiral|${model}|${profile.map(field => params[field.key]).join('x')}`;
+    if (isCatalogItem(type)) {
+      const profile = spiralCatalog.get(model).fields.filter(field => field.diameter || field.ovalDepth || ['width', 'height', 'l1', 'l2'].includes(field.key));
+      ends = `${type}|${model}|${profile.map(field => params[field.key]).join('x')}`;
     }
     if (insulation === 'rubber') return `${ends}|rubber|13`;
     if (insulation === 'artilon' && artilon) return `${ends}|artilon|${artilon}`;
@@ -127,7 +129,7 @@ const orderCalculations = (() => {
   const twoEndDetails = item => item.type === 'reducer' ? reducerDetails(item) : `L${format(item.length)}`;
 
   function specText(item) {
-    if (item.type === 'spiral') return spiralCatalog.spec(item, format);
+    if (isCatalogItem(item.type)) return spiralCatalog.spec(item, format);
     const { length, radius } = item;
     const section = crossSectionText(item);
     const type = ductType(item);
@@ -145,10 +147,11 @@ const orderCalculations = (() => {
 
   function orderPieces(item) {
     if (ductType(item) === 'straight') return splitRun(item.length, item.repeat, item.cutLength);
-    if (item.type === 'spiral' && item.model === 'SP' && item.params.runLength !== undefined) {
-      const { d1, length, runLength } = item.params;
+    if (isCatalogItem(item.type) && spiralCatalog.isStock(item.model) && item.params.runLength !== undefined) {
+      const { runLength, ...params } = item.params;
+      const length = spiralCatalog.stockLengthFor(item);
       const quantity = splitRun(runLength, item.repeat, length).reduce((total, piece) => total + piece.quantity, 0);
-      return quantity ? [{ params: { d1, length }, quantity }] : [];
+      return quantity ? [{ params, quantity }] : [];
     }
     return positiveInteger(item.repeat) ? [{ quantity: item.repeat }] : [];
   }
@@ -158,9 +161,29 @@ const orderCalculations = (() => {
   }
 
   function quantityText(items, count = item => item.quantity) {
-    const sums = { EA: 0, 조: 0 };
+    const sums = { EA: 0, 조: 0, 박스: 0 };
     for (const item of items) sums[itemUnit(item)] += count(item);
     return Object.entries(sums).filter(([, quantity]) => quantity).map(([unit, quantity]) => `${format(quantity)} ${unit}`).join(' · ') || '0 EA';
+  }
+
+  function compareItems(a, b) {
+    const type = ductType(a);
+    const byType = typeOrder.indexOf(type) - typeOrder.indexOf(ductType(b));
+    if (byType) return byType;
+    if (isCatalogItem(type)) {
+      return spiralCatalog.compareModels(a.model, b.model)
+        || (a.params.d1 ?? 0) - (b.params.d1 ?? 0)
+        || (a.params.depth1 ?? 0) - (b.params.depth1 ?? 0)
+        || (a.params.d2 ?? 0) - (b.params.d2 ?? 0)
+        || (a.params.depth2 ?? 0) - (b.params.depth2 ?? 0)
+        || (a.params.d3 ?? 0) - (b.params.d3 ?? 0)
+        || (a.params.depth3 ?? 0) - (b.params.depth3 ?? 0)
+        || (a.params.d4 ?? 0) - (b.params.d4 ?? 0)
+        || (b.params.length ?? 0) - (a.params.length ?? 0);
+    }
+    return a.width - b.width || (a.height ?? 0) - (b.height ?? 0) || (a.neck ?? 0) - (b.neck ?? 0)
+      || (a.outletWidth ?? 0) - (b.outletWidth ?? 0) || (a.outletHeight ?? 0) - (b.outletHeight ?? 0)
+      || (b.length ?? 0) - (a.length ?? 0) || (a.radius ?? 0) - (b.radius ?? 0);
   }
 
   function orderItems(runs) {
@@ -170,7 +193,7 @@ const orderCalculations = (() => {
       const type = ductType(run);
       for (const piece of orderPieces(run)) {
         const productionLength = piece.length ?? run.length;
-        const shape = type === 'spiral' ? [run.model, piece.params ?? run.params, run.spiralThickness]
+        const shape = isCatalogItem(type) ? [run.model, piece.params ?? run.params, run.spiralThickness]
           : [width, height, productionLength, run.radius, run.rise, run.inlet, run.equalEndStraights, run.outletWidth,
             run.outletHeight, run.level, run.side, run.neck, run.diffuserModel, run.neckDimensions];
         const key = JSON.stringify([type, ...shape, material, insulation, artilon, hb, reinforcementWidth, memo]);
@@ -179,22 +202,19 @@ const orderCalculations = (() => {
         else items.set(key, { ...run, type, ...piece, plate: plateThickness(material, run) });
       }
     }
-    return [...items.values()].sort((a, b) => Number(a.type === 'spiral') - Number(b.type === 'spiral')
-      || (b.width ?? b.params?.d1 ?? 0) - (a.width ?? a.params?.d1 ?? 0) || (b.height ?? 0) - (a.height ?? 0)
-      || (a.material ?? '').localeCompare(b.material ?? '') || typeOrder.indexOf(a.type) - typeOrder.indexOf(b.type)
-      || (b.length ?? 0) - (a.length ?? 0) || (b.radius ?? 0) - (a.radius ?? 0));
+    return [...items.values()].sort(compareItems);
   }
 
   function missingDetails(item) {
     const missing = [];
     if (item.type === 'offset' && item.length > offsetMaxLength) missing.push('고바이 총길이 L');
-    if (item.type === 'spiral' && spiralCatalog.get(item.model)?.checkCombination) missing.push('제조사 지름 조합');
+    if (isCatalogItem(item.type) && spiralCatalog.get(item.model)?.checkCombination) missing.push('제조사 지름 조합');
     if (item.insulation === 'artilon' && !item.artilon) missing.push('아티론 두께');
     if (item.insulation !== 'none' && !item.hb) missing.push('HB');
     return missing;
   }
 
-  return { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels,
+  return { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels,
     format, positiveInteger, hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, splitRun, hbKey,
-    insulationText, specText, crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, orderPieces, orderQuantity, quantityText, orderItems, missingDetails };
+    insulationText, specText, crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, orderPieces, orderQuantity, quantityText, compareItems, orderItems, missingDetails };
 })();
