@@ -116,7 +116,7 @@ const spiralCatalog = (() => {
   // Removed models still describe items that already exist in saved orders and drafts.
   const orderModels = ['SP', 'EB45', 'EB90', 'CPM', 'CAPM', 'CAPMG', 'TO', 'CNT', 'CMT', 'RT', 'YB', 'YTB', 'SD', 'RD',
     'HG', 'UB', 'HGR', 'HGS'].map(id => models.get(id));
-  const { dampers, damperLength } = orderCalculations;
+  const { dampers, damperLength, diameterText } = orderCalculations;
   for (const [damper, code] of Object.entries(dampers)) {
     const item = model(code, `원형 ${code} 댐퍼`, 'damper', one,
       { id: `damper-${damper}`, damper, fixedLength: damperLength });
@@ -197,7 +197,7 @@ const spiralCatalog = (() => {
   function spec(item, format) {
     const model = models.get(item.model);
     const params = item.params;
-    if (model.type === 'flex') return `Ø${format(params.d1)} × ${stockLengthText(model.stockLength)}`;
+    if (model.type === 'flex') return `${diameterText(params.d1)} × ${stockLengthText(model.stockLength)}`;
     if (model.type === 'oval') {
       const parts = ovalCatalog.specParts(model, params, format);
       if (model.id === 'OD') parts.push(stockLengthText(params.length));
@@ -205,7 +205,7 @@ const spiralCatalog = (() => {
     }
     const parts = model.fields.filter(field => field.key !== 'flange' && field.key !== 'runLength').map(field => {
       const value = params[field.key];
-      if (field.diameter) return `Ø${format(value)}`;
+      if (field.diameter) return diameterText(value);
       if (model.id === 'SP' && field.key === 'length') return stockLengthText(value);
       const symbol = { length: 'L', width: 'W', height: 'H', height2: 'H2=', l1: 'l1 ', l2: 'l2 ' }[field.key] || field.key;
       return `${symbol}${format(value)}`;

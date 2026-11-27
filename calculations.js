@@ -10,6 +10,7 @@ const orderCalculations = (() => {
   const materials = {
     galvanized: { label: '아연도금강판', thinLimit: 450 },
     galvalume: { label: '갈바륨' },
+    aluminum: { label: '알루미늄' },
     sts201: { label: 'STS 201', thinLimit: thickThreshold },
     sts304: { label: 'STS 304', thinLimit: thickThreshold },
   };
@@ -40,6 +41,7 @@ const orderCalculations = (() => {
     ...Object.fromEntries(Object.entries(diffusers).map(([type, diffuser]) => [type, diffuser.label])) };
   const isDamper = type => Object.hasOwn(dampers, type);
   const isAirOutlet = type => Object.hasOwn(outlets, type);
+  const defaultMaterial = type => isAirOutlet(type) && !diffusers[type] ? 'aluminum' : 'galvanized';
   const ductNames = {
     straight: '각형덕트', elbow: '90° 엘보', elbow45: '45° 엘보', offset: '고바이', reducer: '레두샤', branch: '분기구',
     ...Object.fromEntries(Object.entries(dampers).map(([type, code]) => [type, `각형 ${code} 댐퍼`])),
@@ -55,6 +57,7 @@ const orderCalculations = (() => {
   const itemUnit = item => (isCatalogItem(item.type) ? spiralCatalog.get(item.model)?.unit : null) || 'EA';
   const numberFormat = new Intl.NumberFormat('ko-KR');
   const format = value => numberFormat.format(value);
+  const diameterText = value => `${format(value)}파이`;
   const positiveInteger = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
   const hasTwoEnds = type => type === 'reducer' || type === 'branch';
   const hasOutletDimensions = ({ outletWidth, outletHeight }) => positiveInteger(outletWidth) && positiveInteger(outletHeight);
@@ -123,9 +126,11 @@ const orderCalculations = (() => {
     const section = crossSectionText(item);
     const type = ductType(item);
     if (diffusers[type]) {
-      return item.diffuserModel
-        ? item.diffuserModel.split(' ').at(-1)
-        : `전면 ${diffuserFaceText(type, item.width, item.height)} / 목 Ø${format(item.neck)}`;
+      const model = diffusers[type].models.find(model => model.code === item.diffuserModel);
+      const diameter = diameterText(item.diffuserNominal ?? model?.nominal ?? item.neck);
+      if (type === 'nozzleDiffuser') return diameter;
+      const face = diffusers[type].roundFace || item.width === item.height ? format(item.width) : section;
+      return `D${face}-${diameter}`;
     }
     if (isAirOutlet(type)) return section;
     if (type === 'offset') return `${section} / ${offsetDetails(item)}`;
@@ -178,17 +183,19 @@ const orderCalculations = (() => {
   function orderItems(runs) {
     const items = new Map();
     for (const run of runs) {
-      const { width, height, material, insulation, artilon, voltage, phase, reinforcementWidth, memo } = run;
+      const { width, height, insulation, artilon, voltage, phase, reinforcementWidth, memo } = run;
       const type = ductType(run);
+      const material = isAirOutlet(type) ? run.material ?? defaultMaterial(type) : run.material;
+      const showPlate = run.plateNote !== 'hide';
       for (const piece of orderPieces(run)) {
         const productionLength = piece.length ?? run.length;
         const shape = isCatalogItem(type) ? [run.model, piece.params ?? run.params, run.spiralThickness]
           : [width, height, productionLength, run.radius, run.rise, run.inlet, run.equalEndStraights, run.outletWidth,
             run.outletHeight, run.level, run.side, run.neck, run.diffuserModel, run.neckDimensions];
-        const key = JSON.stringify([type, ...shape, material, insulation, artilon, voltage, phase, reinforcementWidth, memo]);
+        const key = JSON.stringify([type, ...shape, material, showPlate, insulation, artilon, voltage, phase, reinforcementWidth, memo]);
         const item = items.get(key);
         if (item) item.quantity += piece.quantity;
-        else items.set(key, { ...run, type, ...piece, plate: plateThickness(material, run) });
+        else items.set(key, { ...run, type, ...piece, material, plate: plateThickness(material, run) });
       }
     }
     return [...items.values()].sort(compareItems);
@@ -201,7 +208,7 @@ const orderCalculations = (() => {
     return missing;
   }
 
-  return { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels,
-    format, positiveInteger, hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, splitRun,
+  return { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, defaultMaterial, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels,
+    format, diameterText, positiveInteger, hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, splitRun,
     insulationText, specText, crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, orderPieces, orderQuantity, quantityText, compareItems, orderItems, missingDetails };
 })();

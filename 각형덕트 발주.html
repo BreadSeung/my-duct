@@ -273,6 +273,22 @@
               </details>
             </div>
 
+            <fieldset id="grille-material-options" class="form-section" hidden disabled>
+              <legend>재질</legend>
+              <div class="choices">
+                <label><input type="radio" name="grilleMaterial" value="aluminum" checked><span>알루미늄</span></label>
+                <label><input type="radio" name="grilleMaterial" value="galvanized"><span>아연도금강판</span></label>
+                <label><input type="radio" name="grilleMaterial" value="sts304"><span>STS 304</span></label>
+              </div>
+            </fieldset>
+            <fieldset id="diffuser-material-options" class="form-section" hidden disabled>
+              <legend>재질</legend>
+              <div class="choices">
+                <label><input type="radio" name="diffuserMaterial" value="galvanized" checked><span>아연도금강판</span></label>
+                <label><input type="radio" name="diffuserMaterial" value="sts304"><span>STS 304</span></label>
+              </div>
+            </fieldset>
+
             <div id="insulation-section" class="form-section">
               <fieldset id="insulation-options">
                 <legend>보온재를 사용하나요?</legend>
@@ -305,6 +321,13 @@
                 <label id="custom-field" hidden>직접 입력 (mm)<input name="customReinforcement" type="number" min="1" step="1" inputmode="numeric"></label>
               </div>
               <label class="memo-field">비고<input name="memo" maxlength="120" placeholder="예: 보강 위치, 설치 지시사항"></label>
+              <fieldset id="plate-note-options" class="plate-note-options">
+                <legend>비고에 판두께 표시</legend>
+                <div class="choices">
+                  <label><input type="radio" name="plateNote" value="hide" checked><span>숨김</span></label>
+                  <label><input type="radio" name="plateNote" value="show"><span>표시</span></label>
+                </div>
+              </fieldset>
             </div>
             <div class="entry-actions">
               <button id="add-entry" class="button primary" type="submit">발주에 추가</button>

@@ -1,6 +1,7 @@
 'use strict';
 
 const ovalCatalog = (() => {
+  const { diameterText } = orderCalculations;
   const depths = [40, 50, 60, 75, 100, 125, 150, 200, 250, 300, 350, 400, 450, 500];
   // D.S. Industry Oval_Ducts_chart.jpg. Each row has the nominal diameter, first depth, and consecutive widths.
   const chart = [
@@ -88,9 +89,9 @@ const ovalCatalog = (() => {
       if (field.ovalDepth || field.key === 'runLength' || field.key === 'length' && model.id === 'OD') return [];
       if (field.ovalEnd) {
         const depth = params[`depth${field.ovalEnd}`];
-        return `Ø${format(value)} (D${format(depth)} × W${format(widthFor(value, depth))})`;
+        return `${diameterText(value)} (D${format(depth)} × W${format(widthFor(value, depth))})`;
       }
-      if (field.diameter) return `Ø${format(value)}`;
+      if (field.diameter) return diameterText(value);
       if (field.key === 'orientation') return value ? `${value}형` : [];
       return `${field.key === 'rise' ? 'H' : 'L'}${format(value)}`;
     });

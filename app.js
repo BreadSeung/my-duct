@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  const { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels, format, positiveInteger,
+  const { stockLength, offsetMaxLength, damperLength, dampers, diffusers, isDamper, isAirOutlet, isCatalogItem, materials, defaultMaterial, ductNames, ductType, itemName, itemUnit, elbowAngles, levelLabels, sideLabels, format, positiveInteger,
     hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, insulationText, specText,
     crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, splitRun, orderPieces, orderQuantity, quantityText, compareItems, orderItems, missingDetails } = orderCalculations;
   const storageKey = 'hanguk-duct-order-v1';
@@ -12,7 +12,7 @@
   const officeDeliveryAddress = '경기도 고양시 일산동구 장대길 160-50 한국닥트';
   const draftFields = ['type', 'width', 'height', 'neck', 'diffuserNominal', 'diffuserModel', 'length', 'cutLength', 'radius', 'rise', 'offsetLength', 'includeInlet', 'inlet', 'repeat',
     'outletWidth', 'outletHeight', 'reducerLength', 'level', 'side',
-    'material', 'insulation', 'voltage', 'phase', 'reinforcement', 'reinforcementSize', 'customReinforcement', 'memo'];
+    'material', 'grilleMaterial', 'diffuserMaterial', 'insulation', 'voltage', 'phase', 'reinforcement', 'reinforcementSize', 'customReinforcement', 'memo', 'plateNote'];
   const fields = Object.fromEntries(draftFields.map(name => [name, form.elements.namedItem(name)]));
   const spiral = mountSpiralEntry();
   const partGroups = {
@@ -22,7 +22,11 @@
     flex: { button: byId('choose-flex'), picker: byId('flex-part-picker'), type: 'flex' },
     outlet: { button: byId('choose-outlet'), picker: byId('outlet-part-picker'), type: 'grille' }
   };
-  const choiceDefaults = { material: 'galvanized', insulation: 'none', reinforcement: 'no', level: 'center', side: 'center' };
+  const choiceDefaults = { material: defaultMaterial('straight'), grilleMaterial: defaultMaterial('grille'),
+    diffuserMaterial: defaultMaterial('roundDiffuser'), insulation: 'none', reinforcement: 'no', level: 'center', side: 'center', plateNote: 'hide' };
+  const outletMaterialField = type => diffusers[type] ? 'diffuserMaterial' : 'grilleMaterial';
+  const supportsPlateNotes = type => !isAirOutlet(type) && type !== 'flex';
+  const plateNoteChoice = (values, id) => values.plateNote ?? (id && supportsPlateNotes(values.type) ? 'show' : choiceDefaults.plateNote);
   const supportsReinforcement = type => type === 'straight' || Boolean(elbowAngles[type]);
   const isMotorDamper = ({ type, model }) => ['mvd', 'mfd'].includes(type === 'spiral' ? spiralCatalog.get(model)?.damper : type);
   const motorPowerText = ({ voltage, phase }) => [voltage, phase].filter(Boolean).join(' ');
@@ -71,6 +75,9 @@
     const draft = { ...Object.fromEntries(draftFields.map(name => [name, fields[name].value])), editingId };
     if (isCatalogItem(fields.type.value)) draft.spiral = spiral.read();
     if (byId('damper-power').disabled) draft.voltage = draft.phase = '';
+    if (byId('grille-material-options').disabled) draft.grilleMaterial = choiceDefaults.grilleMaterial;
+    if (byId('diffuser-material-options').disabled) draft.diffuserMaterial = choiceDefaults.diffuserMaterial;
+    if (!supportsPlateNotes(draft.type)) draft.plateNote = choiceDefaults.plateNote;
     if (!diffusers[draft.type]) {
       draft.diffuserNominal = '';
       draft.diffuserModel = '';
@@ -136,6 +143,7 @@
     if (!saved) return Boolean(hasWork(order));
     const values = saved.order.draft;
     const draft = Object.fromEntries(draftFields.map(name => [name, values[name] || choiceDefaults[name] || '']));
+    draft.plateNote = plateNoteChoice(values, values.editingId);
     if (wasManualDiffuser(values)) draft.diffuserNominal = 'legacy';
     draft.editingId = values.editingId ?? null;
     if (values.spiral) {
@@ -298,7 +306,11 @@
   }
 
   function readConditions(geometry) {
-    if (isAirOutlet(geometry.type) || geometry.type === 'flex') return { material: null, insulation: 'none' };
+    if (geometry.type === 'flex') return { material: null, insulation: 'none' };
+    if (isAirOutlet(geometry.type)) {
+      const material = fields[outletMaterialField(geometry.type)].value || defaultMaterial(geometry.type);
+      return { material, insulation: 'none' };
+    }
     const insulation = fields.insulation.value || choiceDefaults.insulation;
     const material = isCatalogItem(geometry.type) ? geometry.material : fields.material.value;
     return { material: material || choiceDefaults.material, insulation };
@@ -454,6 +466,12 @@
     power.hidden = power.disabled = !isMotorDamper(geometry);
     byId('rect-material-section').hidden = round || airOutlet;
     byId('rect-material-options').disabled = round || airOutlet;
+    const grilleMaterial = byId('grille-material-options');
+    const diffuserMaterial = byId('diffuser-material-options');
+    grilleMaterial.hidden = grilleMaterial.disabled = !outletNeck;
+    diffuserMaterial.hidden = diffuserMaterial.disabled = !diffuser;
+    const plateNoteOptions = byId('plate-note-options');
+    plateNoteOptions.hidden = plateNoteOptions.disabled = !supportsPlateNotes(type);
     byId('insulation-section').hidden = airOutlet || type === 'flex';
     byId('insulation-options').disabled = airOutlet || type === 'flex';
     byId('quantity-label').textContent = straight || catalogStock ? '같은 구간 수' : `수량 (${itemUnit(geometry)})`;
@@ -620,6 +638,7 @@
     spiral.reset(values.spiral, values.type);
     // Earlier drafts saved the cross-section in a single text field.
     const restored = { ...(values.size ? parseDimensions(values.size) : null), ...values };
+    restored.plateNote = plateNoteChoice(restored, id);
     legacyDiffuserType = wasManualDiffuser(restored) ? restored.type : undefined;
     for (const name of draftFields) {
       if (name !== 'diffuserNominal' && name !== 'diffuserModel' && restored[name] !== undefined && restored[name] !== null) fields[name].value = restored[name];
@@ -653,6 +672,12 @@
 
   function rowNotes(item) {
     const notes = [];
+    const material = item.type === 'flex' ? spiralCatalog.get(item.model).materialLabel
+      : item.material !== defaultMaterial(item.type) ? materials[item.material]?.label : '';
+    if (material) notes.push({ text: material });
+    if (supportsPlateNotes(item.type) && item.plateNote !== 'hide') {
+      notes.push({ text: item.plate === null ? '판두께 제품 표준' : `판두께 ${item.plate}T` });
+    }
     const power = motorPowerText(item);
     if (power) notes.push({ text: `전원 ${power}` });
     if (item.type === 'flex') {
@@ -668,18 +693,10 @@
     return notes;
   }
 
-  function rowData(item) {
-    const spec = specText(item);
-    const notes = rowNotes(item);
-    if (isAirOutlet(item.type)) return [spec, '—', '', notes];
-    if (item.type === 'flex') return [spec, spiralCatalog.get(item.model).materialLabel, '', notes];
-    return [spec, materials[item.material].label, item.plate === null ? '제품 표준' : `${item.plate}T`, notes];
-  }
-
   function buildTable(print = false) {
     const headers = print
-      ? ['번호', '품명', '규격 (mm)', '강판 / 판두께', '단위', '수량', '비고']
-      : ['품명 / 규격 (mm)', '강판 / 판두께', '수량', '비고'];
+      ? ['번호', '품명', '규격 (mm)', '단위', '수량', '비고']
+      : ['품명 / 규격 (mm)', '수량', '비고'];
     const table = el('table', undefined, print ? 'print-table' : 'items-table');
     const headerRow = table.createTHead().insertRow();
     if (!print) {
@@ -696,7 +713,7 @@
     screenBody?.setAttribute('role', 'rowgroup');
     for (const [index, item] of items.entries()) {
       const body = screenBody ?? table.createTBody();
-      const [spec, material, thickness, notes] = rowData(item);
+      const notes = rowNotes(item);
       const row = body.insertRow();
       if (print) {
         row.insertCell().textContent = index + 1;
@@ -706,7 +723,7 @@
       if (!print) specCell.append(el('div', itemName(item), 'table-item-name'));
       const twoEnds = hasTwoEnds(item.type);
       const specificationClass = isCatalogItem(item.type) ? 'table-spec spiral-spec' : 'table-spec';
-      specCell.append(el('strong', twoEnds || item.type === 'offset' ? crossSectionText(item) : spec, specificationClass));
+      specCell.append(el('strong', twoEnds || item.type === 'offset' ? crossSectionText(item) : specText(item), specificationClass));
       if (twoEnds) {
         specCell.append(el('strong', ` → ${outletSectionText(item)}`, 'table-spec second-section'),
           el('small', twoEndDetails(item), 'table-fitting-details'));
@@ -716,12 +733,12 @@
         const details = spiralCatalog.details(item, format);
         if (details.length) specCell.append(el('small', details.join(' · '), 'table-fitting-details'));
       }
-      row.insertCell().append(el('span', material), el('small', thickness));
       const unit = itemUnit(item);
       if (print) row.insertCell().textContent = unit;
       const quantity = el('strong', print ? format(item.quantity) : `${format(item.quantity)} ${unit}`, 'table-quantity');
       row.insertCell().append(quantity);
       const notesCell = row.insertCell();
+      notesCell.className = 'table-notes';
       if (!print && notes.length) notesCell.append(el('span', '비고', 'mobile-label'));
       for (const { text, warning } of notes) notesCell.append(el('small', text, warning ? 'unconfirmed' : ''));
       if (!print) {
@@ -754,6 +771,7 @@
       const type = ductType(run);
       const details = isAirOutlet(type) || type === 'flex' ? []
         : [materials[run.material].label, insulationText(run), run.reinforcementWidth ? `보강 ${format(run.reinforcementWidth)} mm` : '보강 미설치'];
+      if (isAirOutlet(type) && run.material && run.material !== defaultMaterial(type)) details.push(materials[run.material].label);
       const power = motorPowerText(run);
       if (power) details.push(`전원 ${power}`);
       const quantity = type === 'flex' ? ` · ${format(orderQuantity(run))} 박스`
@@ -814,12 +832,11 @@
   function exportCsv() {
     const rows = [['한국닥트 발주서'], ...Object.entries(infoLabels).map(([key, label]) => [label, state.meta[key] || ''])];
     if (items.some(item => missingDetails(item).length)) rows.push(['문서 상태', '확인용 · 사양 미확정']);
-    rows.push([], ['품명', '규격 (mm)', '강판', '판두께', '단위', '수량', '비고']);
+    rows.push([], ['품명', '규격 (mm)', '단위', '수량', '비고']);
     for (const item of items) {
-      const [spec, material, thickness, notes] = rowData(item);
       const details = isCatalogItem(item.type) ? spiralCatalog.details(item, format) : [];
-      details.push(...notes.map(note => note.text));
-      rows.push([itemName(item), spec, material, thickness, itemUnit(item), item.quantity, details.join(' / ')]);
+      details.push(...rowNotes(item).map(note => note.text));
+      rows.push([itemName(item), specText(item), itemUnit(item), item.quantity, details.join(' / ')]);
     }
     const csv = rows.map(row => row.map(cell => {
       let value = String(cell);
@@ -907,6 +924,7 @@
     }
     const run = { id: editingId || crypto.randomUUID(), ...size, ...geometry, repeat, ...conditions,
       reinforcementWidth, memo: fields.memo.value.trim() };
+    if (supportsPlateNotes(run.type)) run.plateNote = fields.plateNote.value;
     if (conditions.insulation === 'artilon' && previous?.artilon) run.artilon = previous.artilon;
     if (isMotorDamper(geometry)) {
       if (fields.voltage.value) run.voltage = fields.voltage.value;
@@ -940,7 +958,8 @@
     if (button.dataset.action === 'edit') {
       const preset = [100, 150, 200].includes(run.reinforcementWidth);
       const type = ductType(run);
-      fillForm({ ...run, type, length: type === 'straight' ? run.length : '',
+      const outletMaterial = isAirOutlet(type) ? { [outletMaterialField(type)]: run.material ?? defaultMaterial(type) } : {};
+      fillForm({ ...run, ...outletMaterial, type, material: isAirOutlet(type) ? null : run.material, length: type === 'straight' ? run.length : '',
         spiral: isCatalogItem(type) ? run : undefined,
         offsetLength: type === 'offset' ? run.length : '', includeInlet: type === 'offset' ? (run.inlet === null ? 'no' : 'yes') : '',
         reducerLength: type === 'reducer' ? run.length : '',

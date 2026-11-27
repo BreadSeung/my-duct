@@ -6,7 +6,7 @@ const orderPdf = (() => {
   const scale = 2;
   const margin = 44;
   const contentWidth = pageWidth - margin * 2;
-  const columnWidths = [43, 96, 173, 110, 43, 52, 189];
+  const columnWidths = [43, 100, 195, 43, 52, 273];
   const diagramWidth = 340;
   const colors = { ink: '#172c24', brand: '#255440', muted: '#4d6157', line: '#aebbb1', tint: '#e8f0e9',
     warning: '#824313', warningTint: '#f7eee1' };
@@ -62,7 +62,7 @@ const orderPdf = (() => {
       }
       ctx.strokeStyle = colors.line;
       ctx.strokeRect(x, top, width, height);
-      ctx.textAlign = [0, 4, 5].includes(index) ? 'center' : 'left';
+      ctx.textAlign = [0, 3, 4].includes(index) ? 'center' : 'left';
       const textX = ctx.textAlign === 'center' ? x + width / 2 : x + 7;
       for (const [n, line] of lines.entries()) {
         textStyle(ctx, line.size, line.bold, line.color);
