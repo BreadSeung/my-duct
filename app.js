@@ -917,11 +917,13 @@
     else state.runs.push(run);
     const spiralDefaults = round && spiralCatalog.isOrderModel(run.model)
       ? { model: run.model, params: run.params.length && spiralCatalog.isStock(run.model) ? { length: run.params.length } : undefined } : undefined;
-    fillForm({ type: run.type, spiral: spiralDefaults });
+    const straight = run.type === 'straight';
+    fillForm({ type: run.type, spiral: spiralDefaults, ...(straight ? size : {}) });
     saveState();
     refreshOrder();
     setMessage(wasEditing ? '품목을 수정했습니다.' : `${itemName(run)} 품목을 추가했습니다.`);
-    focusPart(true);
+    if (straight) fields.length.focus({ preventScroll: true });
+    else focusPart(true);
   });
 
   function focusPart(preventScroll = false) {
