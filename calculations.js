@@ -57,7 +57,7 @@ const orderCalculations = (() => {
   const itemUnit = item => (isCatalogItem(item.type) ? spiralCatalog.get(item.model)?.unit : null) || 'EA';
   const numberFormat = new Intl.NumberFormat('ko-KR');
   const format = value => numberFormat.format(value);
-  const diameterText = value => `${format(value)}파이`;
+  const diameterText = value => `${format(value)}Ø`;
   const positiveInteger = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
   const hasTwoEnds = type => type === 'reducer' || type === 'branch';
   const hasOutletDimensions = ({ outletWidth, outletHeight }) => positiveInteger(outletWidth) && positiveInteger(outletHeight);
