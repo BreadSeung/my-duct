@@ -186,13 +186,12 @@ const orderCalculations = (() => {
       const { width, height, insulation, artilon, voltage, phase, reinforcementWidth, memo } = run;
       const type = ductType(run);
       const material = isAirOutlet(type) ? run.material ?? defaultMaterial(type) : run.material;
-      const showPlate = run.plateNote !== 'hide';
       for (const piece of orderPieces(run)) {
         const productionLength = piece.length ?? run.length;
         const shape = isCatalogItem(type) ? [run.model, piece.params ?? run.params, run.spiralThickness]
           : [width, height, productionLength, run.radius, run.rise, run.inlet, run.equalEndStraights, run.outletWidth,
             run.outletHeight, run.level, run.side, run.neck, run.diffuserModel, run.neckDimensions];
-        const key = JSON.stringify([type, ...shape, material, showPlate, insulation, artilon, voltage, phase, reinforcementWidth, memo]);
+        const key = JSON.stringify([type, ...shape, material, insulation, artilon, voltage, phase, reinforcementWidth, memo]);
         const item = items.get(key);
         if (item) item.quantity += piece.quantity;
         else items.set(key, { ...run, type, ...piece, material, plate: plateThickness(material, run) });

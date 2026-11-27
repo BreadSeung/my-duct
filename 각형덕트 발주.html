@@ -321,13 +321,6 @@
                 <label id="custom-field" hidden>직접 입력 (mm)<input name="customReinforcement" type="number" min="1" step="1" inputmode="numeric"></label>
               </div>
               <label class="memo-field">비고<input name="memo" maxlength="120" placeholder="예: 보강 위치, 설치 지시사항"></label>
-              <fieldset id="plate-note-options" class="plate-note-options">
-                <legend>비고에 판두께 표시</legend>
-                <div class="choices">
-                  <label><input type="radio" name="plateNote" value="hide" checked><span>숨김</span></label>
-                  <label><input type="radio" name="plateNote" value="show"><span>표시</span></label>
-                </div>
-              </fieldset>
             </div>
             <div class="entry-actions">
               <button id="add-entry" class="button primary" type="submit">발주에 추가</button>
@@ -344,7 +337,13 @@
           </section>
 
           <section id="order-items-panel" class="card order-items" aria-labelledby="items-title" tabindex="-1">
-            <div class="section-heading"><h2 id="items-title">발주 품목</h2><span id="order-size" class="unit-note">0개 품목 · 총 0 EA</span></div>
+            <div class="section-heading">
+              <h2 id="items-title">발주 품목</h2>
+              <div class="order-items-tools">
+                <label class="plate-note-toggle"><input id="show-plate-notes" type="checkbox">비고에 판두께 표시</label>
+                <span id="order-size" class="unit-note">0개 품목 · 총 0 EA</span>
+              </div>
+            </div>
             <p id="order-warning" class="notice" role="status" hidden></p>
             <div id="empty-order" class="empty-order">
               <p>등록된 발주 품목이 없습니다.</p>

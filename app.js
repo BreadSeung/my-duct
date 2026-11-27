@@ -5,14 +5,16 @@
     hasOutletDimensions, hasTwoEnds, branchGeometry, longSide, parseDimensions, plateThickness, insulationText, specText,
     crossSectionText, outletSectionText, diffuserFaceText, offsetDetails, twoEndDetails, splitRun, orderPieces, orderQuantity, quantityText, compareItems, orderItems, missingDetails } = orderCalculations;
   const storageKey = 'hanguk-duct-order-v1';
+  const plateNoteKey = `${storageKey}-show-plate-notes`;
   const byId = id => document.getElementById(id);
   const form = byId('entry-form');
   const info = byId('order-info');
+  const plateNoteToggle = byId('show-plate-notes');
   const infoLabels = { site: '현장명', supplier: '수신처', orderDate: '발주일', deliveryDate: '납품일', contact: '담당 / 연락처', address: '납품 장소' };
   const officeDeliveryAddress = '경기도 고양시 일산동구 장대길 160-50 한국닥트';
   const draftFields = ['type', 'width', 'height', 'neck', 'diffuserNominal', 'diffuserModel', 'length', 'cutLength', 'radius', 'rise', 'offsetLength', 'includeInlet', 'inlet', 'repeat',
     'outletWidth', 'outletHeight', 'reducerLength', 'level', 'side',
-    'material', 'grilleMaterial', 'diffuserMaterial', 'insulation', 'voltage', 'phase', 'reinforcement', 'reinforcementSize', 'customReinforcement', 'memo', 'plateNote'];
+    'material', 'grilleMaterial', 'diffuserMaterial', 'insulation', 'voltage', 'phase', 'reinforcement', 'reinforcementSize', 'customReinforcement', 'memo'];
   const fields = Object.fromEntries(draftFields.map(name => [name, form.elements.namedItem(name)]));
   const spiral = mountSpiralEntry();
   const partGroups = {
@@ -23,10 +25,8 @@
     outlet: { button: byId('choose-outlet'), picker: byId('outlet-part-picker'), type: 'grille' }
   };
   const choiceDefaults = { material: defaultMaterial('straight'), grilleMaterial: defaultMaterial('grille'),
-    diffuserMaterial: defaultMaterial('roundDiffuser'), insulation: 'none', reinforcement: 'no', level: 'center', side: 'center', plateNote: 'hide' };
+    diffuserMaterial: defaultMaterial('roundDiffuser'), insulation: 'none', reinforcement: 'no', level: 'center', side: 'center' };
   const outletMaterialField = type => diffusers[type] ? 'diffuserMaterial' : 'grilleMaterial';
-  const supportsPlateNotes = type => !isAirOutlet(type) && type !== 'flex';
-  const plateNoteChoice = (values, id) => values.plateNote ?? (id && supportsPlateNotes(values.type) ? 'show' : choiceDefaults.plateNote);
   const supportsReinforcement = type => type === 'straight' || Boolean(elbowAngles[type]);
   const isMotorDamper = ({ type, model }) => ['mvd', 'mfd'].includes(type === 'spiral' ? spiralCatalog.get(model)?.damper : type);
   const motorPowerText = ({ voltage, phase }) => [voltage, phase].filter(Boolean).join(' ');
@@ -77,7 +77,6 @@
     if (byId('damper-power').disabled) draft.voltage = draft.phase = '';
     if (byId('grille-material-options').disabled) draft.grilleMaterial = choiceDefaults.grilleMaterial;
     if (byId('diffuser-material-options').disabled) draft.diffuserMaterial = choiceDefaults.diffuserMaterial;
-    if (!supportsPlateNotes(draft.type)) draft.plateNote = choiceDefaults.plateNote;
     if (!diffusers[draft.type]) {
       draft.diffuserNominal = '';
       draft.diffuserModel = '';
@@ -143,7 +142,6 @@
     if (!saved) return Boolean(hasWork(order));
     const values = saved.order.draft;
     const draft = Object.fromEntries(draftFields.map(name => [name, values[name] || choiceDefaults[name] || '']));
-    draft.plateNote = plateNoteChoice(values, values.editingId);
     if (wasManualDiffuser(values)) draft.diffuserNominal = 'legacy';
     draft.editingId = values.editingId ?? null;
     if (values.spiral) {
@@ -470,8 +468,6 @@
     const diffuserMaterial = byId('diffuser-material-options');
     grilleMaterial.hidden = grilleMaterial.disabled = !outletNeck;
     diffuserMaterial.hidden = diffuserMaterial.disabled = !diffuser;
-    const plateNoteOptions = byId('plate-note-options');
-    plateNoteOptions.hidden = plateNoteOptions.disabled = !supportsPlateNotes(type);
     byId('insulation-section').hidden = airOutlet || type === 'flex';
     byId('insulation-options').disabled = airOutlet || type === 'flex';
     byId('quantity-label').textContent = straight || catalogStock ? '같은 구간 수' : `수량 (${itemUnit(geometry)})`;
@@ -638,7 +634,6 @@
     spiral.reset(values.spiral, values.type);
     // Earlier drafts saved the cross-section in a single text field.
     const restored = { ...(values.size ? parseDimensions(values.size) : null), ...values };
-    restored.plateNote = plateNoteChoice(restored, id);
     legacyDiffuserType = wasManualDiffuser(restored) ? restored.type : undefined;
     for (const name of draftFields) {
       if (name !== 'diffuserNominal' && name !== 'diffuserModel' && restored[name] !== undefined && restored[name] !== null) fields[name].value = restored[name];
@@ -675,7 +670,7 @@
     const material = item.type === 'flex' ? spiralCatalog.get(item.model).materialLabel
       : item.material !== defaultMaterial(item.type) ? materials[item.material]?.label : '';
     if (material) notes.push({ text: material });
-    if (supportsPlateNotes(item.type) && item.plateNote !== 'hide') {
+    if (plateNoteToggle.checked && !isAirOutlet(item.type) && item.type !== 'flex') {
       notes.push({ text: item.plate === null ? '판두께 제품 표준' : `판두께 ${item.plate}T` });
     }
     const power = motorPowerText(item);
@@ -924,7 +919,6 @@
     }
     const run = { id: editingId || crypto.randomUUID(), ...size, ...geometry, repeat, ...conditions,
       reinforcementWidth, memo: fields.memo.value.trim() };
-    if (supportsPlateNotes(run.type)) run.plateNote = fields.plateNote.value;
     if (conditions.insulation === 'artilon' && previous?.artilon) run.artilon = previous.artilon;
     if (isMotorDamper(geometry)) {
       if (fields.voltage.value) run.voltage = fields.voltage.value;
@@ -1094,6 +1088,19 @@
 
   window.addEventListener('beforeprint', preparePrint);
   byId('csv').addEventListener('click', exportCsv);
+  try {
+    plateNoteToggle.checked = localStorage.getItem(plateNoteKey) === 'true';
+  } catch {
+    plateNoteToggle.checked = false;
+  }
+  plateNoteToggle.addEventListener('change', () => {
+    try {
+      localStorage.setItem(plateNoteKey, String(plateNoteToggle.checked));
+    } catch {
+      // The setting still applies while this page is open.
+    }
+    byId('order-table').replaceChildren(buildTable());
+  });
 
   for (const canvas of form.querySelectorAll('canvas[data-part]')) drawPartThumbnail(canvas, canvas.dataset.part);
   restoreOrderForm();
